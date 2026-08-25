@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#091428">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>LoL Remote Pick</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="hextech-theme">
+  <div id="app" class="app-container">
+    <!-- Top Global Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div id="connection-badge" class="connection-badge disconnected" title="Connection Status">
+          <span class="status-dot"></span>
+          <span id="connection-text" class="status-text">Disconnected</span>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div id="profile-container" class="profile-container hidden">
+          <div class="avatar-frame">
+            <img id="user-avatar" class="user-avatar" src="" alt="Avatar" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23091428%22/><circle cx=%2250%22 cy=%2240%22 r=%2222%22 fill=%22%23c8aa6e%22/><path d=%22M20 90 C 20 65, 80 65, 80 90 Z%22 fill=%22%23c8aa6e%22/></svg>'">
+            <span id="user-level" class="user-level">1</span>
+          </div>
+          <span id="user-name" class="user-name">Summoner</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <button id="btn-connect-phone" class="icon-btn" title="Connect Phone / QR Code" aria-label="Connect Phone / QR Code">
+          <span class="btn-icon">📱</span>
+        </button>
+        <button id="btn-wakelock" class="icon-btn" title="Screen Wake Lock" aria-label="Screen Wake Lock">
+          <span class="btn-icon">💡</span>
+        </button>
+        <button id="btn-sound" class="icon-btn active" title="Sound Effects" aria-label="Toggle Sound">
+          <span id="sound-icon" class="btn-icon">🔊</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main View Switcher -->
+    <main class="app-main">
+      <!-- 1. DISCONNECTED / STANDBY VIEW -->
+      <section id="view-disconnected" class="view-panel active">
+        <div class="standby-card">
+          <div class="hextech-rune-spinner">
+            <div class="rune-ring outer"></div>
+            <div class="rune-ring inner"></div>
+            <div class="rune-core">
+              <svg class="hex-icon" viewBox="0 0 100 100">
+                <polygon points="50,10 90,30 90,70 50,90 10,70 10,30" fill="none" stroke="#c8aa6e" stroke-width="3"/>
+                <polygon points="50,22 80,38 80,62 50,78 20,62 20,38" fill="rgba(10, 200, 185, 0.2)" stroke="#0ac8b9" stroke-width="2"/>
+                <circle cx="50" cy="50" r="10" fill="#c8aa6e"/>
+              </svg>
+            </div>
+          </div>
+          <h2 class="standby-title">League Client Disconnected</h2>
+          <p class="standby-desc">Start League of Legends on your PC or launch with Mock Mode to control your lobby remotely.</p>
+          <div class="standby-actions">
+            <button id="btn-reconnect" class="btn btn-gold">
+              <span class="btn-text">RETRY CONNECTION</span>
+            </button>
+            <button id="btn-standby-qr" class="btn btn-cyan">
+              <span class="btn-text">📱 CONNECT PHONE / QR</span>
+            </button>
+          </div>
+          <div id="reconnect-status" class="reconnect-status">Auto-retrying in background...</div>
+        </div>
+      </section>
+
+      <!-- 2. LOBBY VIEW -->
+      <section id="view-lobby" class="view-panel hidden">
+        <div class="lobby-container">
+          <!-- Queue Selection Card -->
+          <div class="hextech-card queue-card">
+            <div class="card-header">
+              <span class="header-tag">GAME MODE</span>
+              <span id="current-queue-badge" class="queue-badge">Ranked Solo/Duo</span>
+            </div>
+            <div class="queue-selector-grid">
+              <button class="queue-btn active" data-queue-id="420">
+                <span class="q-icon">⚔️</span>
+                <span class="q-name">Ranked Solo</span>
+              </button>
+              <button class="queue-btn" data-queue-id="440">
+                <span class="q-icon">🛡️</span>
+                <span class="q-name">Ranked Flex</span>
+              </button>
+              <button class="queue-btn" data-queue-id="400">
+                <span class="q-icon">🎯</span>
+                <span class="q-name">Normal Draft</span>
+              </button>
+              <button class="queue-btn" data-queue-id="450">
+                <span class="q-icon">❄️</span>
+                <span class="q-name">ARAM</span>
+              </button>
+              <button class="queue-btn" data-queue-id="490">
+                <span class="q-icon">⚡</span>
+                <span class="q-name">Quickplay</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Position Selectors (Primary & Secondary Roles) -->
+          <div id="position-card" class="hextech-card position-card">
+            <div class="card-header">
+              <span class="header-tag">POSITION PREFERENCES</span>
+            </div>
+            <div class="role-selectors-row">
+              <div class="role-selector-block">
+                <span class="role-label">Primary Role</span>
+                <div class="role-dropdown-wrapper">
+                  <select id="select-role-primary" class="hextech-select">
+                    <option value="TOP">Top</option>
+                    <option value="JUNGLE">Jungle</option>
+                    <option value="MIDDLE" selected>Middle</option>
+                    <option value="BOTTOM">Bottom</option>
+                    <option value="UTILITY">Support</option>
+                    <option value="FILL">Fill</option>
+                  </select>
+                  <div class="select-icon-preview" id="primary-role-icon">MID</div>
+                </div>
+              </div>
+
+              <div class="role-selector-block">
+                <span class="role-label">Secondary Role</span>
+                <div class="role-dropdown-wrapper">
+                  <select id="select-role-secondary" class="hextech-select">
+                    <option value="TOP">Top</option>
+                    <option value="JUNGLE">Jungle</option>
+                    <option value="MIDDLE">Middle</option>
+                    <option value="BOTTOM" selected>Bottom</option>
+                    <option value="UTILITY">Support</option>
+                    <option value="FILL">Fill</option>
+                  </select>
+                  <div class="select-icon-preview" id="secondary-role-icon">BOT</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lobby Members -->
+          <div class="hextech-card members-card">
+            <div class="card-header">
+              <span class="header-tag">PARTY MEMBERS</span>
+              <span id="members-count" class="count-tag">1 / 5</span>
+            </div>
+            <div id="lobby-members-list" class="members-list">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Lobby Bottom CTA -->
+          <div class="lobby-bottom-bar">
+            <button id="btn-start-queue" class="btn btn-gold btn-large pulse-glow">
+              <span class="btn-glow"></span>
+              <span class="btn-text">START QUEUE</span>
+            </button>
+            <button id="btn-create-lobby" class="btn btn-cyan btn-large hidden">
+              <span class="btn-text">CREATE LOBBY</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. IN-QUEUE VIEW -->
+      <section id="view-in-queue" class="view-panel hidden">
+        <div class="in-queue-container">
+          <div class="queue-radar-wrapper">
+            <div class="radar-sweep"></div>
+            <div class="radar-ring ring-1"></div>
+            <div class="radar-ring ring-2"></div>
+            <div class="radar-ring ring-3"></div>
+            <div class="queue-timer-display">
+              <span id="queue-time-elapsed" class="timer-time">00:00</span>
+              <span id="queue-time-estimated" class="timer-est">Estimated 01:30</span>
+            </div>
+          </div>
+
+          <div class="queue-info-card">
+            <span class="queue-status-pulse">FINDING MATCH</span>
+            <h3 id="queue-current-name" class="queue-name-banner">Ranked Solo/Duo</h3>
+            <div class="queue-positions-summary">
+              <span id="queue-pos-primary" class="badge-role">MID</span>
+              <span class="role-separator">/</span>
+              <span id="queue-pos-secondary" class="badge-role">BOT</span>
+            </div>
+          </div>
+
+          <div class="queue-bottom-bar">
+            <button id="btn-cancel-queue" class="btn btn-danger btn-large">
+              <span class="btn-text">CANCEL QUEUE</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. READY CHECK (MATCH FOUND) MODAL / VIEW -->
+      <section id="view-ready-check" class="view-panel ready-check-overlay hidden">
+        <div class="ready-check-modal">
+          <div class="modal-glow-border"></div>
+          
+          <div class="ready-header">
+            <div class="hex-badge">⚔️</div>
+            <h2 class="ready-title">MATCH FOUND!</h2>
+            <p class="ready-subtitle">A game is ready for you</p>
+          </div>
+
+          <div class="ready-timer-container">
+            <div class="ready-progress-bar">
+              <div id="ready-progress-fill" class="progress-fill"></div>
+            </div>
+            <div class="ready-timer-text">
+              <span id="ready-seconds-left">10</span>s
+            </div>
+          </div>
+
+          <div class="ready-players-status">
+            <div id="ready-player-dots" class="player-dots-grid">
+              <!-- 10 dots generated in js -->
+            </div>
+            <span id="ready-accepted-count" class="accepted-count-text">0 / 10 ACCEPTED</span>
+          </div>
+
+          <div class="ready-actions-container">
+            <button id="btn-ready-accept" class="btn btn-accept btn-large pulse-emerald">
+              <span class="btn-glow"></span>
+              <span class="btn-text">ACCEPT</span>
+            </button>
+            <button id="btn-ready-decline" class="btn btn-decline">
+              <span class="btn-text">DECLINE</span>
+            </button>
+          </div>
+
+          <div id="ready-response-badge" class="response-status-badge hidden">
+            <span>YOU ACCEPTED</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. CHAMP SELECT VIEW -->
+      <section id="view-champ-select" class="view-panel hidden">
+        <div class="champ-select-container">
+          <!-- Top Phase & Timer Header -->
+          <div class="cs-top-bar">
+            <div class="cs-phase-info">
+              <span id="cs-phase-title" class="cs-phase-title">BANNING PHASE</span>
+              <div class="cs-timer-wrapper">
+                <span id="cs-timer-value" class="cs-timer-value">30</span>
+                <div class="cs-timer-bar">
+                  <div id="cs-timer-fill" class="cs-timer-fill"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Turn Banner Flasher -->
+            <div id="cs-turn-banner" class="cs-turn-banner hidden">
+              <span class="turn-flasher-icon">⚠️</span>
+              <span id="cs-turn-text" class="turn-flasher-text">YOUR TURN TO BAN</span>
+            </div>
+          </div>
+
+          <!-- Rosters & Bans Accordion / Strip -->
+          <div class="cs-teams-summary">
+            <!-- Ally Team Strip -->
+            <div class="cs-team ally-team">
+              <div class="team-header">ALLIES</div>
+              <div id="cs-ally-roster" class="roster-slots">
+                <!-- 5 Ally slots -->
+              </div>
+              <div class="team-bans">
+                <span class="bans-label">Bans:</span>
+                <div id="cs-ally-bans" class="bans-slots"></div>
+              </div>
+            </div>
+
+            <!-- Enemy Team Strip -->
+            <div class="cs-team enemy-team">
+              <div class="team-header">ENEMIES</div>
+              <div id="cs-enemy-roster" class="roster-slots">
+                <!-- 5 Enemy slots -->
+              </div>
+              <div class="team-bans">
+                <span class="bans-label">Bans:</span>
+                <div id="cs-enemy-bans" class="bans-slots"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Champion Filter & Search -->
+          <div class="cs-filter-bar">
+            <div class="cs-search-wrapper">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="champ-search-input" class="hextech-input" placeholder="Search champion..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+              <button id="champ-search-clear" class="btn-clear hidden">✕</button>
+            </div>
+
+            <div class="cs-role-tabs">
+              <button class="role-tab active" data-role="ALL">All</button>
+              <button class="role-tab" data-role="TOP">Top</button>
+              <button class="role-tab" data-role="JUNGLE">Jg</button>
+              <button class="role-tab" data-role="MIDDLE">Mid</button>
+              <button class="role-tab" data-role="BOTTOM">Bot</button>
+              <button class="role-tab" data-role="UTILITY">Sup</button>
+            </div>
+          </div>
+
+          <!-- Champion Grid -->
+          <div class="cs-champions-grid-container">
+            <div id="champions-grid" class="champions-grid">
+              <!-- Champion cards rendered by JS -->
+            </div>
+          </div>
+
+          <!-- Bottom Fixed Action Bar -->
+          <div class="cs-bottom-action-bar">
+            <div class="cs-selection-preview">
+              <div class="preview-avatar-box">
+                <img id="cs-preview-icon" class="preview-avatar" src="" alt="None" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23091428%22/><text x=%2250%22 y=%2260%22 fill=%22%23c8aa6e%22 font-size=%2240%22 text-anchor=%22middle%22>?</text></svg>'">
+              </div>
+              <div class="preview-text-box">
+                <span id="cs-preview-name" class="preview-name">Select Champion</span>
+                <span id="cs-preview-sub" class="preview-sub">Tap a champion above</span>
+              </div>
+            </div>
+
+            <!-- Summoner Spells Trigger Buttons -->
+            <div class="cs-spells-picker-triggers">
+              <button id="btn-spell-1" class="spell-slot-btn" title="Summoner Spell 1 (D)">
+                <img id="spell-1-icon" class="spell-icon-img" src="" alt="Spell 1" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23005a82%22/><text x=%2250%22 y=%2265%22 fill=%22%23f0e6d2%22 font-size=%2240%22 text-anchor=%22middle%22>D</text></svg>'">
+                <span class="spell-key-tag">D</span>
+              </button>
+              <button id="btn-spell-2" class="spell-slot-btn" title="Summoner Spell 2 (F)">
+                <img id="spell-2-icon" class="spell-icon-img" src="" alt="Spell 2" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23005a82%22/><text x=%2250%22 y=%2265%22 fill=%22%23f0e6d2%22 font-size=%2240%22 text-anchor=%22middle%22>F</text></svg>'">
+                <span class="spell-key-tag">F</span>
+              </button>
+            </div>
+
+            <!-- Main Lock-In / Ban Action Button -->
+            <div class="cs-main-action-wrapper">
+              <button id="btn-cs-action" class="btn btn-gold btn-lockin" disabled>
+                <span id="cs-action-btn-text" class="btn-text">LOCK IN</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. IN-GAME VIEW -->
+      <section id="view-in-game" class="view-panel hidden">
+        <div class="in-game-card">
+          <div class="in-game-shield-icon">
+            <svg viewBox="0 0 100 100" class="game-shield-svg">
+              <polygon points="50,5 95,20 95,60 50,95 5,60 5,20" fill="#091428" stroke="#c8aa6e" stroke-width="4"/>
+              <polygon points="50,15 85,27 85,55 50,85 15,55 15,27" fill="rgba(10, 200, 185, 0.15)" stroke="#0ac8b9" stroke-width="2"/>
+              <circle cx="50" cy="50" r="16" fill="#c8aa6e"/>
+            </svg>
+          </div>
+          <h2 class="in-game-title">Match In Progress</h2>
+          <p class="in-game-desc">Your game is running! Switch back to your PC to play.</p>
+          <div class="in-game-champ-box">
+            <img id="in-game-champ-icon" class="in-game-avatar" src="" alt="Champion" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23091428%22/><circle cx=%2250%22 cy=%2250%22 r=%2230%22 fill=%22%23c8aa6e%22/></svg>'">
+            <span id="in-game-champ-name" class="in-game-champ-name">Champion</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Summoner Spells Bottom Sheet Modal -->
+    <div id="modal-spells" class="bottom-sheet-modal hidden">
+      <div class="sheet-backdrop" id="sheet-spells-backdrop"></div>
+      <div class="sheet-content">
+        <div class="sheet-drag-handle"></div>
+        <div class="sheet-header">
+          <h3 id="sheet-spells-title" class="sheet-title">Select Summoner Spell</h3>
+          <button id="sheet-spells-close" class="btn-close">✕</button>
+        </div>
+        <div id="spells-grid" class="spells-grid">
+          <!-- Rendered in JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Connect Phone / QR Code Modal Overlay -->
+    <div id="modal-connect-phone" class="qr-modal-overlay hidden">
+      <div class="qr-modal-backdrop" id="qr-modal-backdrop"></div>
+      <div class="qr-modal-card">
+        <div class="qr-modal-header">
+          <div class="qr-title-box">
+            <span class="qr-icon">📱</span>
+            <div>
+              <h3 class="qr-modal-title">Connect Smartphone</h3>
+              <span class="qr-modal-subtitle">Control League of Legends from your phone</span>
+            </div>
+          </div>
+          <button id="qr-modal-close" class="btn-close">✕</button>
+        </div>
+
+        <div class="qr-code-body">
+          <div id="qr-svg-container" class="qr-svg-wrapper">
+            <!-- Dynamically populated SVG or canvas QR -->
+            <div class="qr-loading">Loading QR Code...</div>
+          </div>
+
+          <div class="qr-instructions">
+            <div class="qr-step">
+              <span class="step-num">1</span>
+              <span class="step-desc">Connect phone to <strong>same Wi-Fi</strong> network</span>
+            </div>
+            <div class="qr-step">
+              <span class="step-num">2</span>
+              <span class="step-desc">Open Camera or QR scanner on phone</span>
+            </div>
+            <div class="qr-step">
+              <span class="step-num">3</span>
+              <span class="step-desc">Scan or open the URL below</span>
+            </div>
+          </div>
+
+          <!-- URL Box with Copy Button -->
+          <div class="qr-url-card">
+            <input type="text" id="qr-url-input" class="qr-url-field" readonly value="http://localhost:8000">
+            <button id="btn-copy-qr-url" class="btn btn-gold btn-copy" title="Copy URL">
+              <span id="copy-btn-text">COPY</span>
+            </button>
+          </div>
+
+          <!-- Alternative Adapters dropdown if multiple exist -->
+          <div id="qr-adapters-container" class="qr-adapters-box hidden">
+            <label for="qr-adapter-select" class="qr-adapter-label">Select Network Adapter:</label>
+            <select id="qr-adapter-select" class="hextech-select qr-select">
+              <!-- Populated in JS -->
+            </select>
+          </div>
+
+          <div class="qr-firewall-note">
+            <span class="note-icon">💡</span>
+            <span>If phone cannot load page, allow Python/Port 8000 in Windows Firewall.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="toast-container"></div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
