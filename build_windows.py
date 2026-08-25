@@ -18,8 +18,8 @@ ROOT_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
 DIST_DIR = ROOT_DIR / "dist"
 BUILD_DIR = ROOT_DIR / "build"
-
-
+ICON_FILE = ROOT_DIR / "assets" / "icon.ico"
+VERSION_FILE = ROOT_DIR / "version_info.txt"
 def check_pyinstaller() -> None:
     """Ensure PyInstaller is installed in the current Python environment."""
     try:
@@ -74,6 +74,11 @@ def build_executable() -> None:
         "--hidden-import=pydantic_settings",
         "--noconfirm",
     ]
+
+    if ICON_FILE.is_file():
+        args.append(f"--icon={ICON_FILE}")
+    if VERSION_FILE.is_file():
+        args.append(f"--version-file={VERSION_FILE}")
 
     print(f"[INFO] Running PyInstaller with args: {' '.join(args)}")
     PyInstaller.__main__.run(args)
