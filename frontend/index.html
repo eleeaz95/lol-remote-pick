@@ -105,6 +105,10 @@
                 <span class="q-icon">❄️</span>
                 <span class="q-name">ARAM</span>
               </button>
+              <button class="queue-btn" data-queue-id="2400">
+                <span class="q-icon">🌀</span>
+                <span class="q-name">ARAM Mayhem</span>
+              </button>
               <button class="queue-btn" data-queue-id="490">
                 <span class="q-icon">⚡</span>
                 <span class="q-name">Quickplay</span>
@@ -279,7 +283,7 @@
               <div id="cs-ally-roster" class="roster-slots">
                 <!-- 5 Ally slots -->
               </div>
-              <div class="team-bans">
+              <div id="cs-ally-bans-row" class="team-bans">
                 <span class="bans-label">Bans:</span>
                 <div id="cs-ally-bans" class="bans-slots"></div>
               </div>
@@ -291,15 +295,41 @@
               <div id="cs-enemy-roster" class="roster-slots">
                 <!-- 5 Enemy slots -->
               </div>
-              <div class="team-bans">
+              <div id="cs-enemy-bans-row" class="team-bans">
                 <span class="bans-label">Bans:</span>
                 <div id="cs-enemy-bans" class="bans-slots"></div>
               </div>
             </div>
           </div>
 
+          <!-- ARAM / Bench Mode Panel (no bans, restricted pool) -->
+          <div id="cs-bench-panel" class="cs-bench-panel hidden">
+            <!-- Initial Card Selection banner (first seconds when choosing starter) -->
+            <div id="cs-bench-choose-banner" class="bench-choose-banner hidden">
+              <span class="choose-banner-title">CHOOSE YOUR CHAMPION</span>
+              <span class="choose-banner-sub">Tap one of your cards below to lock it in</span>
+            </div>
+
+            <div id="cs-bench-current-section" class="bench-section hidden">
+              <span class="bench-section-label">YOUR CHAMPION</span>
+              <div id="cs-bench-current" class="bench-current-row"></div>
+            </div>
+
+            <div id="cs-bench-cards-section" class="bench-section hidden">
+              <span id="cs-bench-cards-label" class="bench-section-label">YOUR CARDS <span class="bench-hint">tap to take</span></span>
+              <div id="cs-bench-cards" class="bench-cards-row"></div>
+            </div>
+
+            <div id="cs-bench-pool-section" class="bench-section hidden">
+              <span class="bench-section-label">TEAM BENCH <span class="bench-hint">tap to swap</span></span>
+              <div id="cs-bench-pool" class="bench-cards-row"></div>
+            </div>
+
+            <p id="cs-bench-empty" class="bench-empty-hint hidden">Waiting for champions to be dealt...</p>
+          </div>
+
           <!-- Champion Filter & Search -->
-          <div class="cs-filter-bar">
+          <div id="cs-filter-bar" class="cs-filter-bar">
             <div class="cs-search-wrapper">
               <span class="search-icon">🔍</span>
               <input type="text" id="champ-search-input" class="hextech-input" placeholder="Search champion..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
@@ -317,7 +347,7 @@
           </div>
 
           <!-- Champion Grid -->
-          <div class="cs-champions-grid-container">
+          <div id="cs-champions-container" class="cs-champions-grid-container">
             <div id="champions-grid" class="champions-grid">
               <!-- Champion cards rendered by JS -->
             </div>

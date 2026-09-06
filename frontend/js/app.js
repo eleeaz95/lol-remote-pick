@@ -61,7 +61,10 @@
         spell1Id: 4, // Flash
         spell2Id: 14, // Ignite
         selectedChampionId: 0
-      }
+      },
+      pickMode: 'DRAFT', // 'DRAFT' | 'BENCH' (ARAM-like: random champs + shared bench)
+      benchEnabled: false,
+      bench: [] // [{ championId, isPriority }]
     }
   };
 
@@ -73,6 +76,7 @@
     spellsMap: new Map(), // ID -> Spell
     queues: [],
     selectedChampionId: 0,
+    benchSwapPending: null,
     selectedSpellSlot: 1, // 1 for D, 2 for F
     activeRoleFilter: 'ALL',
     searchQuery: '',
@@ -522,6 +526,9 @@
     // Render champion grid & spell modal
     renderChampionsGrid();
     renderSpellsModal();
+    if (state.phase === 'CHAMP_SELECT') {
+      renderChampSelectView();
+    }
   }
 
   // =========================================================================
@@ -762,7 +769,16 @@
           spell1Id: cs.mySelection?.spell1Id || 4,
           spell2Id: cs.mySelection?.spell2Id || 14,
           selectedChampionId: cs.mySelection?.selectedChampionId || 0
-        }
+        },
+        pickMode: (cs.pickMode || 'DRAFT').toUpperCase(),
+        benchEnabled: Boolean(cs.benchEnabled),
+        bench: Array.isArray(cs.bench)
+          ? cs.bench
+            .map(entry => (typeof entry === 'object' && entry !== null
+              ? { championId: Number(entry.championId) || 0, isPriority: Boolean(entry.isPriority) }
+              : { championId: Number(entry) || 0, isPriority: false }))
+            .filter(entry => entry.championId > 0)
+          : []
       };
 
       if (state.phase === 'CHAMP_SELECT' && state.champSelect.sessionActive) {
@@ -1168,25 +1184,51 @@
   }
 
   // 5. Champ Select View
+  function isBenchMode() {
+    const cs = state.champSelect;
+    if (cs.pickMode === 'BENCH' || cs.benchEnabled === true) return true;
+    const qid = Number(state.lobby?.queueId || state.queue?.queueId || 0);
+    if ([450, 720, 721, 2400, 2450, 3220, 3270, 3280].includes(qid)) return true;
+    const qname = (state.lobby?.queueName || '').toUpperCase();
+    if (qname.includes('ARAM') || qname.includes('MAYHEM')) return true;
+    return false;
+  }
+
+  function toggleElementById(id, visible) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden', !visible);
+  }
+
+  function getLocalChampionId() {
+    const cs = state.champSelect;
+    const me = cs.myTeam.find(m => m.isLocalPlayer || m.cellId === cs.cellId);
+    return (me && (me.championId || me.displayedChampionId)) || cs.mySelection.selectedChampionId || 0;
+  }
+
   function renderChampSelectView() {
     const cs = state.champSelect;
+    const benchMode = isBenchMode();
+
+    const view = document.getElementById('view-champ-select');
+    if (view) view.classList.toggle('bench-mode', benchMode);
 
     // Phase Title & Timer
     const phaseTitle = document.getElementById('cs-phase-title');
     if (phaseTitle) {
-      phaseTitle.textContent = `${cs.actionPhase} PHASE`;
-      if (cs.actionPhase === 'BAN') {
-        phaseTitle.classList.add('ban-phase');
-      } else {
+      if (benchMode) {
+        phaseTitle.textContent = 'CHAMPION SWAP';
         phaseTitle.classList.remove('ban-phase');
+      } else {
+        phaseTitle.textContent = `${cs.actionPhase} PHASE`;
+        phaseTitle.classList.toggle('ban-phase', cs.actionPhase === 'BAN');
       }
     }
 
-    // Turn Flasher Banner
+    // Turn Flasher Banner (bench modes have no pick/ban turns)
     const turnBanner = document.getElementById('cs-turn-banner');
     const turnText = document.getElementById('cs-turn-text');
     if (turnBanner && turnText) {
-      if (cs.isMyTurn) {
+      if (cs.isMyTurn && !benchMode) {
         turnBanner.classList.remove('hidden');
         turnText.textContent = cs.actionPhase === 'BAN' ? 'YOUR TURN TO BAN!' : 'YOUR TURN TO PICK!';
       } else {
@@ -1199,6 +1241,17 @@
     // Rosters & Bans
     renderTeamRosters();
 
+    // Draft-only surfaces: bans, search/role filters and the full champion catalog
+    toggleElementById('cs-ally-bans-row', !benchMode);
+    toggleElementById('cs-enemy-bans-row', !benchMode);
+    toggleElementById('cs-filter-bar', !benchMode);
+    toggleElementById('cs-champions-container', !benchMode);
+    toggleElementById('cs-bench-panel', benchMode);
+
+    if (benchMode) {
+      renderBenchPanel();
+    }
+
     // Spells Pickers Buttons
     const spell1Icon = document.getElementById('spell-1-icon');
     const spell2Icon = document.getElementById('spell-2-icon');
@@ -1209,6 +1262,168 @@
 
     // Selected Champ Preview & Action Button
     renderChampSelectActionBar();
+  }
+
+  function getChampion(idOrKey) {
+    if (!idOrKey) return null;
+    const numId = Number(idOrKey);
+    if (!isNaN(numId) && numId > 0) {
+      if (localState.championsMap.has(numId)) {
+        return localState.championsMap.get(numId);
+      }
+    }
+    const strKey = String(idOrKey).toLowerCase();
+    const foundInList = localState.champions.find(c =>
+      c.id === numId ||
+      String(c.key).toLowerCase() === strKey ||
+      String(c.name).toLowerCase() === strKey
+    );
+    if (foundInList) return foundInList;
+
+    const foundInFallback = POPULAR_CHAMPIONS_FALLBACK.find(c =>
+      c.id === numId ||
+      String(c.key).toLowerCase() === strKey ||
+      String(c.name).toLowerCase() === strKey
+    );
+    if (foundInFallback) return foundInFallback;
+
+    return null;
+  }
+
+  // ARAM-like modes: random champion + shared bench, no bans and no free picks
+  function renderBenchPanel() {
+    const cs = state.champSelect;
+    const myChampionId = Number(getLocalChampionId() || 0);
+
+    const hasStarter = myChampionId > 0;
+    toggleElementById('cs-bench-choose-banner', !hasStarter);
+    toggleElementById('cs-bench-current-section', hasStarter);
+
+    const currentRow = document.getElementById('cs-bench-current');
+    if (currentRow) {
+      currentRow.innerHTML = '';
+      if (hasStarter) {
+        const currentCard = buildBenchCard(myChampionId, { current: true });
+        if (currentCard) currentRow.appendChild(currentCard);
+      }
+    }
+
+    const priorityCards = cs.bench.filter(entry => entry.isPriority);
+    const poolCards = cs.bench.filter(entry => !entry.isPriority);
+
+    // Dynamic label depending on whether starter has been selected yet
+    const cardsLabel = document.getElementById('cs-bench-cards-label');
+    if (cardsLabel) {
+      cardsLabel.innerHTML = hasStarter
+        ? 'YOUR CARDS <span class="bench-hint">tap to swap</span>'
+        : 'YOUR CARDS <span class="bench-hint">tap to choose your starter</span>';
+    }
+
+    // If player has priority cards, show them in YOUR CARDS
+    // If NO priority cards exist, but player has no starter yet, show all bench champions as the cards!
+    let displayCards = priorityCards;
+    let displayPool = poolCards;
+    if (!hasStarter && priorityCards.length === 0 && poolCards.length > 0) {
+      displayCards = poolCards;
+      displayPool = [];
+    }
+
+    renderBenchSection('cs-bench-cards-section', 'cs-bench-cards', displayCards, true);
+    renderBenchSection('cs-bench-pool-section', 'cs-bench-pool', displayPool, false);
+
+    const isEmpty = cs.bench.length === 0 && !hasStarter;
+    toggleElementById('cs-bench-empty', isEmpty);
+  }
+
+  function renderBenchSection(sectionId, rowId, entries, isPriority) {
+    const hasEntries = Array.isArray(entries) && entries.length > 0;
+    toggleElementById(sectionId, hasEntries);
+    const row = document.getElementById(rowId);
+    if (!row) return;
+
+    row.innerHTML = '';
+    if (!hasEntries) return;
+
+    entries.forEach(entry => {
+      const card = buildBenchCard(entry.championId, { priority: isPriority });
+      if (card) row.appendChild(card);
+    });
+  }
+
+  function buildBenchCard(championId, { current = false, priority = false } = {}) {
+    const numId = Number(championId);
+    if (!numId || numId <= 0) return null;
+
+    const champ = getChampion(numId);
+    const card = document.createElement('div');
+    card.className = `bench-card ${current ? 'is-current' : ''} ${priority ? 'is-priority' : ''}`;
+    card.setAttribute('data-champ-id', String(numId));
+
+    const champName = champ ? escapeHtml(champ.name) : `Champion #${numId}`;
+    const iconUrl = champ ? getChampionIconUrl(champ.key, champ.id) : '';
+
+    card.innerHTML = `
+      <div class="bench-card-img-box">
+        ${iconUrl ? `<img class="bench-card-img" src="${iconUrl}" alt="${champName}" loading="lazy">` : `<div class="slot-empty-avatar"></div>`}
+      </div>
+      <span class="bench-card-name">${champName}</span>
+      ${current ? '<span class="bench-card-tag">YOURS</span>' : ''}
+      ${priority && !current ? '<span class="bench-card-tag priority-tag">CARD</span>' : ''}
+    `;
+
+    if (!current) {
+      card.addEventListener('click', () => onBenchChampionClick(numId));
+    }
+    return card;
+  }
+
+  async function onBenchChampionClick(championId) {
+    if (!championId || localState.benchSwapPending) return;
+    playClickSound();
+
+    const cs = state.champSelect;
+    const previousChampionId = getLocalChampionId();
+    const previousBench = cs.bench;
+    const previousSelection = cs.mySelection.selectedChampionId;
+
+    // Optimistic swap; a rejected swap is corrected by the next server state push
+    localState.benchSwapPending = championId;
+    cs.bench = cs.bench
+      .filter(entry => entry.championId !== championId)
+      .concat(previousChampionId ? [{ championId: previousChampionId, isPriority: false }] : []);
+    cs.myTeam.forEach(m => {
+      if (m.isLocalPlayer || m.cellId === cs.cellId) {
+        m.championId = championId;
+        m.displayedChampionId = championId;
+        m.championPickIntent = 0;
+        m.isLocked = true;
+        m.isPickIntent = false;
+      }
+    });
+    cs.mySelection.selectedChampionId = championId;
+    localState.selectedChampionId = championId;
+
+    renderBenchPanel();
+    renderTeamRosters();
+    renderChampSelectActionBar();
+
+    const ok = await sendApiRequest('/api/champ-select/bench-swap', { championId });
+    localState.benchSwapPending = null;
+
+    if (ok === false) {
+      cs.bench = previousBench;
+      cs.mySelection.selectedChampionId = previousSelection;
+      cs.myTeam.forEach(m => {
+        if (m.isLocalPlayer || m.cellId === cs.cellId) {
+          m.championId = previousChampionId;
+          m.displayedChampionId = previousChampionId;
+        }
+      });
+      localState.selectedChampionId = previousChampionId;
+      renderBenchPanel();
+      renderTeamRosters();
+      renderChampSelectActionBar();
+    }
   }
 
   function updateChampSelectTimerDisplay() {
@@ -1328,7 +1543,10 @@
 
   function renderChampSelectActionBar() {
     const cs = state.champSelect;
-    const selectedId = localState.selectedChampionId || cs.myPickIntent || cs.mySelection.selectedChampionId;
+    const benchMode = isBenchMode();
+    const selectedId = benchMode
+      ? getLocalChampionId()
+      : (localState.selectedChampionId || cs.myPickIntent || cs.mySelection.selectedChampionId);
     const champ = localState.championsMap.get(selectedId);
 
     const previewIcon = document.getElementById('cs-preview-icon');
@@ -1342,11 +1560,21 @@
       previewName.textContent = champ.name;
     } else {
       previewIcon.src = '';
-      previewName.textContent = 'Select Champion';
-      previewSub.textContent = 'Tap a champion above';
+      previewName.textContent = benchMode ? 'Waiting for champion' : 'Select Champion';
+      previewSub.textContent = benchMode ? 'Your champion is assigned randomly' : 'Tap a champion above';
     }
 
     if (!btnAction) return;
+
+    if (benchMode) {
+      // Champions are assigned; the only action is swapping from the bench
+      if (champ) previewSub.textContent = 'Assigned — swap from the bench';
+      btnAction.classList.add('hidden');
+      btnAction.disabled = true;
+      return;
+    }
+
+    btnAction.classList.remove('hidden');
 
     if (cs.actionPhase === 'BAN' && cs.isMyTurn) {
       // Active Ban turn

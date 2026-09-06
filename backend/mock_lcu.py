@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 from .lcu_connector import LCUCredentials
+from .state_engine import BENCH_QUEUE_IDS
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ MOCK_QUEUES = [
     {"id": 400, "name": "Normal Draft", "shortName": "Draft Pick", "description": "5v5 Normal Draft on Summoner's Rift", "isRanked": False, "category": "PvP"},
     {"id": 440, "name": "Ranked Flex", "shortName": "Flex 5v5", "description": "5v5 Ranked Flex on Summoner's Rift", "isRanked": True, "category": "PvP"},
     {"id": 450, "name": "ARAM", "shortName": "ARAM", "description": "5v5 All Random All Mid on Howling Abyss", "isRanked": False, "category": "PvP"},
+    {"id": 2400, "name": "ARAM: Mayhem", "shortName": "ARAM Mayhem", "description": "5v5 ARAM Mayhem on Howling Abyss", "isRanked": False, "category": "PvP"},
 ]
 
 
@@ -301,6 +303,37 @@ class MockLCUServer:
             await self.broadcast_event("/lol-champ-select/v1/session", self.champ_select)
             return Response(status_code=204)
 
+        @app.post("/lol-champ-select/v1/session/bench/swap/{champion_id}")
+        async def bench_swap(champion_id: int):
+            if not self.champ_select:
+                raise HTTPException(status_code=404, detail="No champ select session")
+            if not self.champ_select.get("benchEnabled"):
+                raise HTTPException(status_code=400, detail="Bench is not enabled for this queue")
+
+            bench = self.champ_select.setdefault("benchChampions", [])
+            index = next(
+                (i for i, entry in enumerate(bench) if entry.get("championId") == champion_id),
+                None,
+            )
+            if index is None:
+                raise HTTPException(status_code=400, detail="Champion is not on the bench")
+
+            local_cell = self.champ_select.get("localPlayerCellId", 0)
+            previous_champion = 0
+            for m in self.champ_select.get("myTeam", []):
+                if m.get("cellId") == local_cell:
+                    previous_champion = m.get("championId", 0)
+                    m["championId"] = champion_id
+
+            bench.pop(index)
+            if previous_champion:
+                bench.append({"championId": previous_champion, "isPriority": False})
+
+            self.champ_select.setdefault("mySelection", {})["selectedChampionId"] = champion_id
+
+            await self.broadcast_event("/lol-champ-select/v1/session", self.champ_select)
+            return Response(status_code=204)
+
         # Metadata
         @app.get("/lol-game-queues/v1/queues")
         async def get_queues():
@@ -404,15 +437,29 @@ class MockLCUServer:
         await self.broadcast_event("/lol-gameflow/v1/gameflow-phase", "ReadyCheck")
         await self.broadcast_event("/lol-matchmaking/v1/ready-check", self.ready_check)
 
-    async def trigger_champ_select(self) -> None:
-        """Transition to CHAMP_SELECT state."""
+    async def trigger_champ_select(self, queue_id: Optional[int] = None) -> None:
+        """Transition to CHAMP_SELECT state (draft or ARAM-style bench session)."""
         self.gameflow_phase = "ChampSelect"
         self.ready_check = None
         self.queue_search = None
 
-        local_cell = 0
-        self.champ_select = {
-            "localPlayerCellId": local_cell,
+        if queue_id is None:
+            queue_id = (self.lobby or {}).get("gameConfig", {}).get("queueId", 420)
+
+        if int(queue_id or 0) in BENCH_QUEUE_IDS:
+            self.champ_select = self._build_bench_session()
+        else:
+            self.champ_select = self._build_draft_session()
+
+        await self.broadcast_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
+        await self.broadcast_event("/lol-champ-select/v1/session", self.champ_select)
+
+    def _build_draft_session(self) -> Dict[str, Any]:
+        """Pick/ban draft session (Summoner's Rift queues)."""
+        return {
+            "localPlayerCellId": 0,
+            "benchEnabled": False,
+            "benchChampions": [],
             "timer": {
                 "phase": "BAN_PICK",
                 "adjustedTimeLeftInPhase": 25.0,
@@ -457,12 +504,62 @@ class MockLCUServer:
             ]
         }
 
-        await self.broadcast_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
-        await self.broadcast_event("/lol-champ-select/v1/session", self.champ_select)
+    def _build_bench_session(self) -> Dict[str, Any]:
+        """ARAM-style session: champions are pre-assigned, no bans, shared bench for swaps."""
+        return {
+            "localPlayerCellId": 0,
+            "benchEnabled": True,
+            # Own unchosen cards land on the bench flagged as priority
+            "benchChampions": [
+                {"championId": 22, "isPriority": True},
+                {"championId": 141, "isPriority": True},
+                {"championId": 51, "isPriority": False},
+                {"championId": 8, "isPriority": False},
+                {"championId": 89, "isPriority": False},
+            ],
+            "timer": {
+                "phase": "BAN_PICK",
+                "adjustedTimeLeftInPhase": 45.0,
+                "totalTimeInPhase": 60.0,
+            },
+            "bans": {
+                "myTeamBans": [],
+                "theirTeamBans": [],
+            },
+            "myTeam": [
+                {"cellId": 0, "summonerName": self.summoner["displayName"], "assignedPosition": "", "championId": 32, "spell1Id": 4, "spell2Id": 32},
+                {"cellId": 1, "summonerName": "AlliedTwo", "assignedPosition": "", "championId": 64, "spell1Id": 4, "spell2Id": 32},
+                {"cellId": 2, "summonerName": "AlliedThree", "assignedPosition": "", "championId": 103, "spell1Id": 4, "spell2Id": 32},
+                {"cellId": 3, "summonerName": "AlliedFour", "assignedPosition": "", "championId": 222, "spell1Id": 4, "spell2Id": 32},
+                {"cellId": 4, "summonerName": "AlliedFive", "assignedPosition": "", "championId": 412, "spell1Id": 4, "spell2Id": 32},
+            ],
+            "theirTeam": [
+                {"cellId": 5, "assignedPosition": "", "championId": 0},
+                {"cellId": 6, "assignedPosition": "", "championId": 0},
+                {"cellId": 7, "assignedPosition": "", "championId": 0},
+                {"cellId": 8, "assignedPosition": "", "championId": 0},
+                {"cellId": 9, "assignedPosition": "", "championId": 0},
+            ],
+            "mySelection": {
+                "spell1Id": 4,
+                "spell2Id": 32,
+                "selectedChampionId": 32,
+            },
+            # ARAM assigns the pick automatically: the action exists but is already completed
+            "actions": [
+                [
+                    {"id": 1, "actorCellId": 0, "championId": 32, "type": "pick", "completed": True, "isInProgress": False, "pickTurn": 1},
+                ]
+            ],
+        }
 
     async def advance_to_pick_phase(self) -> None:
         """Advance mock champ select from ban phase to pick phase."""
         if not self.champ_select:
+            return
+
+        # ARAM-style sessions have no ban phase to advance through
+        if self.champ_select.get("benchEnabled"):
             return
 
         # Complete ban action

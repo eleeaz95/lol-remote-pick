@@ -299,3 +299,73 @@ async def test_app_hub_action_execution(mock_app_and_client):
     assert res_phase["success"] is True
     state = hub.state_engine.get_state()
     assert state["lobby"]["queueId"] == 450
+
+
+@pytest.mark.asyncio
+async def test_aram_champ_select_bench_swap(mock_app_and_client):
+    """Verify ARAM champ select exposes a bench and swapping replaces the assigned champion."""
+    app, client, hub = mock_app_and_client
+
+    await hub.mock_server.trigger_lobby(queue_id=450)
+    await hub.mock_server.trigger_champ_select(queue_id=450)
+    await asyncio.sleep(0.05)
+
+    state = (await client.get("/api/state")).json()
+    cs = state["champSelect"]
+    assert cs["pickMode"] == "BENCH"
+    assert cs["benchEnabled"] is True
+    assert cs["bans"]["myTeamBans"] == []
+    assert cs["isMyTurn"] is False
+
+    me = next(m for m in cs["myTeam"] if m["isLocalPlayer"])
+    assigned_champion = me["championId"]
+    assert assigned_champion > 0
+
+    bench_target = cs["bench"][0]["championId"]
+    assert bench_target != assigned_champion
+
+    # Swap into a bench champion
+    res_swap = await client.post("/api/champ-select/bench-swap", json={"championId": bench_target})
+    assert res_swap.status_code == 200
+    assert res_swap.json()["success"] is True
+    await asyncio.sleep(0.05)
+
+    cs2 = (await client.get("/api/state")).json()["champSelect"]
+    me2 = next(m for m in cs2["myTeam"] if m["isLocalPlayer"])
+    bench_ids = [entry["championId"] for entry in cs2["bench"]]
+    assert me2["championId"] == bench_target
+    assert bench_target not in bench_ids
+    # Previously assigned champion returns to the shared bench
+    assert assigned_champion in bench_ids
+
+    # Champions outside the bench cannot be taken
+    res_invalid = await client.post("/api/champ-select/bench-swap", json={"championId": 999999})
+    assert res_invalid.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_aram_mayhem_lobby_and_champ_select(mock_app_and_client):
+    """Verify creating lobby with queue 2400 (ARAM Mayhem) and entering bench champ select."""
+    app, client, hub = mock_app_and_client
+
+    # Create ARAM Mayhem lobby
+    res_lobby = await client.post("/api/lobby/create", json={"queueId": 2400})
+    assert res_lobby.status_code == 200
+    assert res_lobby.json()["success"] is True
+    await asyncio.sleep(0.05)
+
+    state_lobby = (await client.get("/api/state")).json()
+    assert state_lobby["lobby"]["queueId"] == 2400
+    assert "Mayhem" in state_lobby["lobby"]["queueName"]
+
+    # Enter Champ Select
+    await hub.mock_server.trigger_champ_select(queue_id=2400)
+    await asyncio.sleep(0.05)
+
+    state_cs = (await client.get("/api/state")).json()
+    cs = state_cs["champSelect"]
+    assert cs["pickMode"] == "BENCH"
+    assert cs["benchEnabled"] is True
+    assert len(cs["bench"]) > 0
+    assert cs["isMyTurn"] is False
+    assert cs["bans"]["myTeamBans"] == []

@@ -28,7 +28,54 @@ QUEUE_NAMES = {
     1400: "Ultimate Spellbook",
     1700: "Arena (2v2v2v2)",
     1900: "Pick URF",
+    2400: "ARAM: Mayhem",
+    3270: "ARAM: Mayhem (Custom)",
 }
+
+# Queues whose champion select uses random assignment + shared bench instead of pick/ban draft
+BENCH_QUEUE_IDS = {450, 720, 721, 2400, 2450, 3220, 3270, 3280}
+
+def _extract_bench(session: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Normalize the shared champion bench, accepting object or plain-id LCU payloads."""
+    raw = session.get("benchChampions")
+    if raw is None:
+        raw = session.get("benchChampionIds")
+
+    subset_ids: Set[int] = set()
+    raw_subsets = session.get("subsetChampionIds") or []
+    for s in raw_subsets:
+        try:
+            val = int(s)
+            if val > 0:
+                subset_ids.add(val)
+        except (TypeError, ValueError):
+            pass
+
+    bench: List[Dict[str, Any]] = []
+    seen: Set[int] = set()
+    for entry in raw or []:
+        if isinstance(entry, dict):
+            champion_id = int(entry.get("championId", 0) or 0)
+            is_priority = bool(entry.get("isPriority", False)) or (champion_id in subset_ids)
+        else:
+            try:
+                champion_id = int(entry)
+            except (TypeError, ValueError):
+                continue
+            is_priority = champion_id in subset_ids
+
+        if champion_id <= 0 or champion_id in seen:
+            continue
+        seen.add(champion_id)
+        bench.append({"championId": champion_id, "isPriority": is_priority})
+
+    # Ensure all subsetChampionIds are present on the bench as priority cards
+    for sid in subset_ids:
+        if sid not in seen:
+            seen.add(sid)
+            bench.append({"championId": sid, "isPriority": True})
+
+    return bench
 
 
 class StateEngine:
@@ -52,6 +99,10 @@ class StateEngine:
 
         # Background timers for smoothing transient events
         self._disconnect_task: Optional[asyncio.Task] = None
+        self._active_queue_id: int = 0
+        self._active_game_mode: str = ""
+        self._active_queue_name: str = ""
+
         self._lobby_delete_task: Optional[asyncio.Task] = None
 
         # Cached normalized state & emission deduplication
@@ -162,6 +213,9 @@ class StateEngine:
                         self._lobby_delete_task.cancel()
                         self._lobby_delete_task = None
                     self._raw_lobby = None
+                    self._active_queue_id = 0
+                    self._active_game_mode = ""
+                    self._active_queue_name = ""
                 state_changed = True
             elif "/lol-gameflow/v1/session" in uri:
                 if event_type == "Delete":
@@ -171,6 +225,20 @@ class StateEngine:
                     phase = data.get("phase")
                     if phase:
                         self._gameflow_phase = phase
+                    gdata = data.get("gameData") or {}
+                    q = gdata.get("queue") or {}
+                    qid = q.get("id") or 0
+                    if qid:
+                        try:
+                            self._active_queue_id = int(qid)
+                        except (ValueError, TypeError):
+                            pass
+                    gmode = q.get("gameMode") or (data.get("map") or {}).get("gameMode") or ""
+                    if gmode:
+                        self._active_game_mode = str(gmode).upper()
+                    qname = q.get("name") or q.get("shortName") or ""
+                    if qname:
+                        self._active_queue_name = str(qname)
                 state_changed = True
             elif "/lol-matchmaking/v1/search" in uri or "matchmaking/search" in uri or "search-state" in uri or "/lobby/matchmaking" in uri:
                 if event_type == "Delete":
@@ -197,6 +265,16 @@ class StateEngine:
                         self._lobby_delete_task.cancel()
                         self._lobby_delete_task = None
                     self._raw_lobby = data
+                    game_config = data.get("gameConfig") or {}
+                    qid = game_config.get("queueId") or data.get("queueId") or 0
+                    if qid:
+                        try:
+                            self._active_queue_id = int(qid)
+                        except (ValueError, TypeError):
+                            pass
+                    gmode = game_config.get("gameMode") or ""
+                    if gmode:
+                        self._active_game_mode = str(gmode).upper()
                     state_changed = True
             elif "/lol-matchmaking/v1/ready-check" in uri:
                 if event_type == "Delete":
@@ -204,7 +282,6 @@ class StateEngine:
                 elif isinstance(data, dict):
                     self._raw_ready_check = data
                 state_changed = True
-
             elif "/lol-champ-select/v1/session/my-selection" in uri or "/my-selection" in uri:
                 if isinstance(data, dict):
                     if self._raw_champ_select is None:
@@ -235,6 +312,7 @@ class StateEngine:
         lobby: Optional[Dict[str, Any]] = None,
         ready_check: Optional[Dict[str, Any]] = None,
         champ_select: Optional[Dict[str, Any]] = None,
+        gameflow_session: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Synchronize state from periodic HTTP polling."""
         if summoner is not None:
@@ -242,11 +320,41 @@ class StateEngine:
         p = gameflow_phase if gameflow_phase is not None else phase
         if p is not None:
             self._gameflow_phase = p
+            if p == "None":
+                self._active_queue_id = 0
+                self._active_game_mode = ""
+                self._active_queue_name = ""
         if lobby is not None:
             if self._lobby_delete_task and not self._lobby_delete_task.done():
                 self._lobby_delete_task.cancel()
                 self._lobby_delete_task = None
             self._raw_lobby = lobby
+            game_config = lobby.get("gameConfig") or {}
+            qid = game_config.get("queueId") or lobby.get("queueId") or 0
+            if qid:
+                try:
+                    self._active_queue_id = int(qid)
+                except (ValueError, TypeError):
+                    pass
+            gmode = game_config.get("gameMode") or ""
+            if gmode:
+                self._active_game_mode = str(gmode).upper()
+        if gameflow_session is not None:
+            self._raw_gameflow_session = gameflow_session
+            gdata = gameflow_session.get("gameData") or {}
+            q = gdata.get("queue") or {}
+            qid = q.get("id") or 0
+            if qid:
+                try:
+                    self._active_queue_id = int(qid)
+                except (ValueError, TypeError):
+                    pass
+            gmode = q.get("gameMode") or (gameflow_session.get("map") or {}).get("gameMode") or ""
+            if gmode:
+                self._active_game_mode = str(gmode).upper()
+            qname = q.get("name") or q.get("shortName") or ""
+            if qname:
+                self._active_queue_name = str(qname)
         if ready_check is not None:
             self._raw_ready_check = ready_check
         if champ_select is not None:
@@ -466,6 +574,71 @@ class StateEngine:
             "totalPlayers": total_players,
         }
 
+    def _detect_bench_mode(self, session: Dict[str, Any], bench: List[Dict[str, Any]]) -> bool:
+        """True when champion select assigns random champions with a shared bench (ARAM, Mayhem, & variants)."""
+        # 1. Direct positive indicators
+        if session.get("benchEnabled") is True:
+            return True
+        if bench:
+            return True
+
+        # 2. Check active persistent queue
+        qid = self._active_queue_id
+        if not qid:
+            game_config = (self._raw_lobby or {}).get("gameConfig") or {}
+            gameflow = self._raw_gameflow_session or {}
+            gf_queue = (gameflow.get("gameData") or {}).get("queue") or {}
+            qid = game_config.get("queueId") or gf_queue.get("id") or 0
+
+        try:
+            queue_id = int(qid)
+        except (TypeError, ValueError):
+            queue_id = 0
+
+        if queue_id in BENCH_QUEUE_IDS:
+            return True
+
+        # 3. Check gameMode or queue name
+        gmode = (self._active_game_mode or "").upper()
+        if not gmode:
+            game_config = (self._raw_lobby or {}).get("gameConfig") or {}
+            gameflow = self._raw_gameflow_session or {}
+            gf_queue = (gameflow.get("gameData") or {}).get("queue") or {}
+            gf_map = gameflow.get("map") or {}
+            gmode = str(
+                game_config.get("gameMode") or gf_queue.get("gameMode") or gf_map.get("gameMode") or ""
+            ).upper()
+
+        qname = (self._active_queue_name or "").upper()
+        if not qname:
+            gameflow = self._raw_gameflow_session or {}
+            gf_queue = (gameflow.get("gameData") or {}).get("queue") or {}
+            qname = str(gf_queue.get("name") or gf_queue.get("shortName") or "").upper()
+
+        if gmode.startswith("ARAM") or gmode == "KIWI" or "MAYHEM" in gmode:
+            return True
+        if "ARAM" in qname or "MAYHEM" in qname:
+            return True
+
+        # 4. If session explicitly has ban actions, it's definitely a draft mode
+        has_ban_action = False
+        for group in session.get("actions", []):
+            if isinstance(group, list):
+                for act in group:
+                    if isinstance(act, dict) and act.get("type", "").upper() == "BAN":
+                        has_ban_action = True
+                        break
+
+        if has_ban_action:
+            return False
+
+        # 5. If no bans and no pick turns (or pre-locked picks), treat as bench mode if on Howling Abyss
+        map_id = (self._raw_gameflow_session or {}).get("map", {}).get("id") or 0
+        if map_id == 12:  # Howling Abyss
+            return True
+
+        return False
+
     def _normalize_champ_select(self) -> Dict[str, Any]:
         """Normalize champion select session, actions, teams, timer, and turn status."""
         empty_cs = {
@@ -490,6 +663,9 @@ class StateEngine:
                 "spell2Id": 0,
                 "selectedChampionId": 0,
             },
+            "pickMode": "DRAFT",
+            "benchEnabled": False,
+            "bench": [],
         }
 
         if not self._raw_champ_select:
@@ -638,6 +814,10 @@ class StateEngine:
                         my_selection["selectedChampionId"] = tm["championId"]
                     break
 
+        # 7. Bench / random-pick modes (ARAM and variants)
+        bench = _extract_bench(session)
+        bench_enabled = self._detect_bench_mode(session, bench)
+
         return {
             "sessionActive": True,
             "cellId": local_cell_id,
@@ -655,4 +835,7 @@ class StateEngine:
             "myTeam": my_team,
             "theirTeam": their_team,
             "mySelection": my_selection,
+            "pickMode": "BENCH" if bench_enabled else "DRAFT",
+            "benchEnabled": bench_enabled,
+            "bench": bench,
         }

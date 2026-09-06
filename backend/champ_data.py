@@ -187,6 +187,18 @@ STATIC_QUEUES: List[Dict[str, Any]] = [
         "maxTeamSize": 5,
     },
     {
+        "queueId": 2400,
+        "name": "ARAM: Mayhem",
+        "shortName": "ARAM Mayhem",
+        "description": "5v5 ARAM Mayhem on Howling Abyss",
+        "map": "Howling Abyss",
+        "gameMode": "KIWI",
+        "isRanked": False,
+        "hasPositions": False,
+        "category": "pvp",
+        "maxTeamSize": 5,
+    },
+    {
         "queueId": 490,
         "name": "Quickplay",
         "shortName": "Quickplay",

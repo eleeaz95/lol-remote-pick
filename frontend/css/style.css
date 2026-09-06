@@ -1405,6 +1405,154 @@ body.hextech-theme {
   text-overflow: ellipsis;
 }
 
+/* ARAM / Bench Mode Panel */
+.cs-bench-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 10px;
+  padding-bottom: calc(var(--bottom-bar-height) + 16px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bench-choose-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(10, 200, 185, 0.18) 0%, rgba(200, 170, 110, 0.18) 100%);
+  border: 1px solid rgba(10, 200, 185, 0.5);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 16px rgba(10, 200, 185, 0.25);
+  gap: 4px;
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+.choose-banner-title {
+  font-family: 'Cinzel', serif;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--gold-bright);
+}
+
+.choose-banner-sub {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: var(--text-muted, #a09b8c);
+}
+
+.bench-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bench-section-label {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  color: var(--gold-bright);
+  text-transform: uppercase;
+}
+
+.bench-hint {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  color: var(--text-muted, rgba(240, 230, 210, 0.55));
+  text-transform: none;
+}
+
+.bench-current-row,
+.bench-cards-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bench-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 86px;
+  background: rgba(12, 26, 46, 0.7);
+  border: 1px solid rgba(200, 170, 110, 0.25);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bench-card:active {
+  transform: scale(0.94);
+}
+
+.bench-card.is-current {
+  width: 104px;
+  cursor: default;
+  border: 2px solid var(--gold-bright);
+  box-shadow: 0 0 14px rgba(200, 170, 110, 0.5);
+}
+
+.bench-card.is-priority {
+  border-color: var(--blue-bright, #0ac8b9);
+  box-shadow: 0 0 10px rgba(10, 200, 185, 0.45);
+}
+
+.bench-card-img-box {
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #010a13;
+}
+
+.bench-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bench-card-name {
+  width: 100%;
+  background: rgba(5, 12, 22, 0.95);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-main);
+  text-align: center;
+  padding: 3px 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bench-card-tag {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(200, 170, 110, 0.9);
+  color: #05101c;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+}
+
+.bench-empty-hint {
+  font-size: 12px;
+  color: var(--text-muted, rgba(240, 230, 210, 0.55));
+  text-align: center;
+  margin: 4px 0 0;
+}
+
 /* Bottom Fixed Action Bar */
 .cs-bottom-action-bar {
   position: fixed;

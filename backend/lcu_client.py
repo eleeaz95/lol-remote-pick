@@ -226,6 +226,35 @@ class LCUClient:
         res = await self.request("PATCH", "/lol-champ-select/v1/session/my-selection", json=payload)
         return bool(res and res.status_code in (200, 204))
 
+    async def bench_swap(self, champion_id: int) -> bool:
+        """Swap the local player's champion with one from the shared bench (ARAM-like modes)."""
+        res = await self.request("POST", f"/lol-champ-select/v1/session/bench/swap/{champion_id}")
+        return bool(res and res.status_code in (200, 204))
+
+    async def get_subset_champion_list(self) -> List[int]:
+        """Fetch pickable subset champion IDs in card-selection modes (ARAM / Mayhem)."""
+        res = await self.request("GET", "/lol-lobby-team-builder/champ-select/v1/subset-champion-list")
+        if res and res.status_code == 200:
+            try:
+                data = res.json()
+                if isinstance(data, list):
+                    return [int(x) for x in data if isinstance(x, (int, str)) and int(x) > 0]
+            except Exception:
+                pass
+        return []
+
+    async def get_pickable_champion_ids(self) -> List[int]:
+        """Fetch list of pickable champion IDs for current champ select session."""
+        res = await self.request("GET", "/lol-champ-select/v1/pickable-champion-ids")
+        if res and res.status_code == 200:
+            try:
+                data = res.json()
+                if isinstance(data, list):
+                    return [int(x) for x in data if isinstance(x, (int, str)) and int(x) > 0]
+            except Exception:
+                pass
+        return []
+
     # --- Static / Metadata Endpoints ---
 
     async def get_available_queues(self) -> List[Dict[str, Any]]:
