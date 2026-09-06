@@ -91,6 +91,7 @@
     activeRoleFilter: 'ALL',
     searchQuery: '',
     favoriteChampionIds: loadFavoriteChampions(),
+    lastBansKey: null,
     soundEnabled: localStorage.getItem('lol_sound_enabled') !== 'false',
     wakeLock: null,
     ws: null,
@@ -937,9 +938,13 @@
         localState.lastCsDisplayedSec = -1;
       }
 
-      // Adopt server pick intent if local selection not yet made
+      // Adopt server pick intent if local selection not yet made. A champion that has since been
+      // banned is not a candidate: the client keeps reporting the one you banned as your intent.
       if (!localState.selectedChampionId && (cs.myPickIntent || cs.mySelection?.selectedChampionId)) {
-        localState.selectedChampionId = cs.myPickIntent || cs.mySelection.selectedChampionId;
+        const intent = cs.myPickIntent || cs.mySelection.selectedChampionId;
+        if (!bannedChampionIds().has(Number(intent))) {
+          localState.selectedChampionId = intent;
+        }
       }
     } else if (state.phase !== 'CHAMP_SELECT') {
       localState.csTargetEndMs = 0;
@@ -1396,6 +1401,9 @@
     // Rosters & Bans
     renderTeamRosters();
 
+    // Bans arrive one at a time while the grid is already on screen
+    if (!benchMode) updateChampionGridBans();
+
     // Draft-only surfaces: bans, search/role filters and the full champion catalog
     toggleElementById('cs-ally-bans-row', !benchMode);
     toggleElementById('cs-enemy-bans-row', !benchMode);
@@ -1699,9 +1707,16 @@
   function renderChampSelectActionBar() {
     const cs = state.champSelect;
     const benchMode = isBenchMode();
-    const selectedId = benchMode
+    let selectedId = benchMode
       ? getLocalChampionId()
       : localState.selectedChampionId || cs.myPickIntent || cs.mySelection.selectedChampionId;
+
+    // The client keeps reporting the champion you just banned as your intent, and an enemy ban can
+    // take your pre-selection away mid-phase. Either way there is nothing left to offer.
+    if (!benchMode && bannedChampionIds().has(Number(selectedId))) {
+      selectedId = 0;
+    }
+
     const champ = localState.championsMap.get(selectedId);
 
     const previewIcon = document.getElementById('cs-preview-icon');
@@ -1759,6 +1774,16 @@
   }
 
   // Champion Grid & Search Rendering
+  // The role tabs are labelled with the client's position names; the champion catalog names the
+  // same lanes its own way, so MID and UTILITY need translating or those tabs come up empty.
+  const ROLE_TAB_TO_LANE = {
+    TOP: 'TOP',
+    JUNGLE: 'JUNGLE',
+    MIDDLE: 'MID',
+    BOTTOM: 'BOTTOM',
+    UTILITY: 'SUPPORT',
+  };
+
   function loadFavoriteChampions() {
     try {
       const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
@@ -1807,15 +1832,33 @@
     }
   }
 
-  // The role tabs are labelled with the client's position names; the champion catalog names the
-  // same lanes its own way, so MID and UTILITY need translating or those tabs come up empty.
-  const ROLE_TAB_TO_LANE = {
-    TOP: 'TOP',
-    JUNGLE: 'JUNGLE',
-    MIDDLE: 'MID',
-    BOTTOM: 'BOTTOM',
-    UTILITY: 'SUPPORT',
-  };
+  function bannedChampionIds() {
+    const bans = state.champSelect.bans || {};
+    return new Set([...(bans.myTeamBans || []), ...(bans.theirTeamBans || [])].map(Number));
+  }
+
+  // The grid is built once per champ select, but bans land one by one while it is on screen, so
+  // the cards are restyled in place rather than rebuilt: a rebuild would lose the scroll position.
+  function updateChampionGridBans() {
+    const banned = bannedChampionIds();
+    const key = [...banned].sort((a, b) => a - b).join(',');
+    if (key === localState.lastBansKey) return;
+    localState.lastBansKey = key;
+
+    document.querySelectorAll('#champions-grid .champ-card').forEach((card) => {
+      const championId = Number(card.getAttribute('data-champ-id'));
+      const isBanned = banned.has(championId);
+      card.classList.toggle('banned', isBanned);
+
+      // A champion banned out from under the selection cannot be picked any more, so the action
+      // bar must stop offering it. It is re-rendered later in the same pass.
+      if (isBanned && localState.selectedChampionId === championId) {
+        localState.selectedChampionId = 0;
+        state.champSelect.myPickIntent = 0;
+        card.classList.remove('selected', 'ban-mode', 'preselected');
+      }
+    });
+  }
 
   function renderChampionsGrid() {
     const grid = document.getElementById('champions-grid');
@@ -1842,10 +1885,13 @@
       return rank || a.name.localeCompare(b.name);
     });
 
+    const banned = bannedChampionIds();
+    localState.lastBansKey = [...banned].sort((a, b) => a - b).join(',');
+
     filtered.forEach((champ) => {
       const card = document.createElement('div');
       const isSelected = localState.selectedChampionId === champ.id;
-      const isBanned = cs.bans.myTeamBans.includes(champ.id) || cs.bans.theirTeamBans.includes(champ.id);
+      const isBanned = banned.has(champ.id);
       const isFavorite = isFavoriteChampion(champ.id);
 
       card.className = `champ-card ${isSelected ? 'selected' : ''} ${isBanMode && isSelected ? 'ban-mode' : ''} ${isBanned ? 'banned' : ''} ${isFavorite ? 'is-favorite' : ''}`;
@@ -1876,6 +1922,11 @@
   }
 
   function onChampionCardClick(champ) {
+    if (bannedChampionIds().has(champ.id)) {
+      showToast(champ.name + ' is banned', 'error');
+      return;
+    }
+
     playClickSound();
     localState.selectedChampionId = champ.id;
 
