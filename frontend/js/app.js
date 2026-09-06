@@ -47,6 +47,7 @@
       sessionActive: false,
       cellId: -1,
       isMyTurn: false,
+      localPickCompleted: false,
       actionPhase: 'NONE', // 'BAN' | 'PICK' | 'FINALIZING' | 'PLANNING' | 'NONE'
       activeAction: null, // { id, type, championId, completed, isInProgress }
       timer: {
@@ -874,6 +875,7 @@
         sessionActive: Boolean(cs.sessionActive),
         cellId: cs.cellId !== undefined ? cs.cellId : -1,
         isMyTurn: Boolean(cs.isMyTurn),
+        localPickCompleted: Boolean(cs.localPickCompleted),
         actionPhase: (cs.actionPhase || 'NONE').toUpperCase(),
         activeAction: cs.activeAction || null,
         localPickActionId: cs.localPickActionId || null,
@@ -1750,6 +1752,15 @@
       return;
     }
 
+    // A locked pick is final: the client takes neither another pick nor a hover, so a button
+    // here could only fail. This is the draft counterpart of the bench branch above.
+    if (cs.localPickCompleted) {
+      if (champ) previewSub.textContent = 'Locked in';
+      btnAction.classList.add('hidden');
+      btnAction.disabled = true;
+      return;
+    }
+
     btnAction.classList.remove('hidden');
 
     if (cs.actionPhase === 'BAN' && cs.isMyTurn) {
@@ -1922,6 +1933,11 @@
   }
 
   function onChampionCardClick(champ) {
+    if (state.champSelect.localPickCompleted && !isBenchMode()) {
+      showToast('Your pick is already locked in', 'error');
+      return;
+    }
+
     if (bannedChampionIds().has(champ.id)) {
       showToast(champ.name + ' is banned', 'error');
       return;
