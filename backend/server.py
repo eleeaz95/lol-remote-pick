@@ -300,6 +300,24 @@ def generate_svg_qr(url: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _mock_local_action_open(session: Dict[str, Any], action_type: str) -> bool:
+    """True when the mock session still owes the local player a ban or a pick.
+
+    Only used to give /api/mock/advance a step per draft subphase, so a change can be walked
+    through by hand instead of waiting on the simulation timer.
+    """
+    local_cell = session.get("localPlayerCellId", 0)
+    for group in session.get("actions") or []:
+        for action in group if isinstance(group, list) else []:
+            if (
+                action.get("actorCellId") == local_cell
+                and action.get("type") == action_type
+                and not action.get("completed")
+            ):
+                return True
+    return False
+
+
 class AppHub:
     """Coordinates state engine, LCU connector/client/websocket, and client connections."""
 
@@ -809,9 +827,14 @@ class AppHub:
                 elif cur_phase == "ReadyCheck":
                     await self.mock_server.trigger_champ_select()
                 elif cur_phase == "ChampSelect":
-                    if (self.mock_server.champ_select or {}).get("allowSubsetChampionPicks"):
+                    session = self.mock_server.champ_select or {}
+                    if session.get("allowSubsetChampionPicks"):
                         # Card subphase: close the cards and open the shared bench first
                         await self.mock_server.open_bench_pool()
+                    elif _mock_local_action_open(session, "ban"):
+                        await self.mock_server.advance_to_pick_phase()
+                    elif _mock_local_action_open(session, "pick"):
+                        await self.mock_server.advance_to_finalizing_phase()
                     else:
                         await self.mock_server.trigger_in_game()
                 elif cur_phase == "InProgress":
