@@ -485,22 +485,36 @@ class StateEngine:
         is_local_leader = bool(self._raw_lobby.get("localMember", {}).get("isLeader", False))
 
         local_sum_id = self._raw_summoner.get("summonerId")
+        local_puuid = self._raw_summoner.get("puuid")
+        local_display_name = self._normalize_summoner()["displayName"]
 
         for m in members_raw:
             is_leader = m.get("isLeader", False)
-            is_local = m.get("isLocalMember", False) or (local_sum_id and m.get("summonerId") == local_sum_id)
+            # Live lobby payloads carry no isLocalMember flag, so identity rests on matching the profile.
+            is_local = (
+                m.get("isLocalMember", False)
+                or bool(local_puuid and m.get("puuid") == local_puuid)
+                or bool(local_sum_id and m.get("summonerId") == local_sum_id)
+            )
             if is_local and is_leader:
                 is_local_leader = True
 
             first_pref = m.get("firstPositionPreference", "UNSELECTED")
             second_pref = m.get("secondPositionPreference", "UNSELECTED")
 
+            # Riot ID migration left summonerName empty on lobby members, and the payload carries no
+            # gameName/tagLine to rebuild it from. The local player is filled in from the fetched profile;
+            # naming the others needs a per-puuid lookup, which normalization cannot perform.
             summoner_name = m.get("summonerName") or m.get("summonerInternalName") or ""
+            if not summoner_name and is_local:
+                summoner_name = local_display_name
 
             members_normalized.append(
                 {
                     "summonerId": m.get("summonerId", 0),
                     "summonerName": summoner_name,
+                    "profileIconId": m.get("summonerIconId", 0) or m.get("profileIconId", 0),
+                    "summonerLevel": m.get("summonerLevel", 0),
                     "firstPositionPreference": first_pref,
                     "secondPositionPreference": second_pref,
                     "positionPreferences": {

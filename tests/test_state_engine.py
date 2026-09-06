@@ -685,3 +685,49 @@ async def test_state_engine_reports_missing_summoner_until_fetched():
     assert state["summoner"]["displayName"] == "Eleeaz#LAS"
     assert state["summoner"]["profileIconId"] == 3456
     assert state["summoner"]["summonerLevel"] == 456
+
+
+async def test_state_engine_lobby_member_uses_riot_id_and_icon():
+    """Live lobby members carry an empty summonerName and an unused summonerIconId."""
+    engine = StateEngine()
+    engine.set_connected(True)
+    engine.update_from_poll(
+        summoner={
+            "displayName": "",
+            "gameName": "Eleeaz",
+            "tagLine": "LAS",
+            "summonerId": 833435,
+            "puuid": "abc-123",
+            "profileIconId": 3456,
+            "summonerLevel": 456,
+        }
+    )
+
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/lobby",
+        {
+            "gameConfig": {"queueId": 400},
+            "members": [
+                # Shape taken from a real client: no isLocalMember, empty names, icon under summonerIconId
+                {
+                    "summonerId": 833435,
+                    "puuid": "abc-123",
+                    "summonerName": "",
+                    "summonerInternalName": "",
+                    "summonerIconId": 3456,
+                    "summonerLevel": 456,
+                    "isLeader": True,
+                },
+                {"summonerId": 999, "puuid": "def-456", "summonerName": "", "summonerIconId": 12, "isLeader": False},
+            ],
+        },
+    )
+
+    members = engine.get_state()["lobby"]["members"]
+    assert members[0]["isLocalMember"] is True
+    assert members[0]["summonerName"] == "Eleeaz#LAS"
+    assert members[0]["profileIconId"] == 3456
+    assert members[0]["summonerLevel"] == 456
+    # Other members still get their avatar; naming them needs a puuid lookup the engine cannot do
+    assert members[1]["isLocalMember"] is False
+    assert members[1]["profileIconId"] == 12
