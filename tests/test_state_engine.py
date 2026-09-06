@@ -836,3 +836,28 @@ async def test_state_engine_lobby_reports_whether_the_queue_has_roles():
     # An unknown queue keeps the selector rather than hiding a control that may be needed
     await engine.handle_lcu_event("/lol-lobby/v2/lobby", {"gameConfig": {"queueId": 99999}, "members": []})
     assert engine.get_state()["lobby"]["hasPositions"] is True
+
+
+async def test_state_engine_lobby_trusts_the_client_position_selector_flag():
+    """Swiftplay puts positions on per-champion slots, and the client says so in the lobby."""
+    engine = StateEngine()
+    engine.set_connected(True)
+
+    # Shape taken from a live Swiftplay lobby
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/lobby",
+        {
+            "gameConfig": {"queueId": 480, "showPositionSelector": False, "showQuickPlaySlotSelection": True},
+            "members": [],
+        },
+    )
+    lobby = engine.get_state()["lobby"]
+    assert lobby["queueName"] == "Swiftplay"
+    assert lobby["hasPositions"] is False
+
+    # The client's flag wins over the static catalogue in both directions
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/lobby",
+        {"gameConfig": {"queueId": 450, "showPositionSelector": True}, "members": []},
+    )
+    assert engine.get_state()["lobby"]["hasPositions"] is True

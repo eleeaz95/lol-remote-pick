@@ -19,6 +19,7 @@ QUEUE_NAMES = {
     430: "Normal Blind 5v5",
     440: "Ranked Flex 5v5",
     450: "ARAM 5v5",
+    480: "Swiftplay",
     490: "Quickplay",
     700: "Clash",
     830: "Co-op vs AI (Intro)",
@@ -532,10 +533,14 @@ class StateEngine:
 
         can_start = self._raw_lobby.get("canStartActivity", is_local_leader)
 
-        # Random-champion and blind queues have no lanes to prefer, so the client should not
-        # offer the choice at all. Unknown queues keep the roles, which is the safer default.
-        queue_meta = get_queue_by_id(queue_id) or {}
-        has_positions = bool(queue_meta.get("hasPositions", True)) and queue_id not in BENCH_QUEUE_IDS
+        # The client states outright whether the lane picker applies to this lobby, which beats
+        # any table we keep: Riot rotates queues, and Swiftplay puts positions on per-champion
+        # slots instead. Fall back to the static catalogue only when the field is absent.
+        if "showPositionSelector" in game_config:
+            has_positions = bool(game_config.get("showPositionSelector"))
+        else:
+            queue_meta = get_queue_by_id(queue_id) or {}
+            has_positions = bool(queue_meta.get("hasPositions", True)) and queue_id not in BENCH_QUEUE_IDS
 
         return {
             "queueId": queue_id,

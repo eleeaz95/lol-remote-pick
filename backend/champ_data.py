@@ -198,14 +198,17 @@ STATIC_QUEUES: List[Dict[str, Any]] = [
         "maxTeamSize": 5,
     },
     {
-        "queueId": 490,
-        "name": "Quickplay",
-        "shortName": "Quickplay",
-        "description": "5v5 Quickplay on Summoner's Rift",
+        # Swiftplay replaced Quickplay (490), which the client now reports as PlatformDisabled.
+        # Champions, positions and spells are chosen per slot in the lobby, so the plain
+        # position selector does not apply here - the client sets showPositionSelector false.
+        "queueId": 480,
+        "name": "Swiftplay",
+        "shortName": "Swiftplay",
+        "description": "5v5 Swiftplay on Summoner's Rift",
         "map": "Summoner's Rift",
         "gameMode": "CLASSIC",
         "isRanked": False,
-        "hasPositions": True,
+        "hasPositions": False,
         "category": "pvp",
         "maxTeamSize": 5,
     },

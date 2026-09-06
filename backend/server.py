@@ -574,7 +574,14 @@ class AppHub:
                     if self.mock_server.lobby:
                         self.state_engine.update_from_poll(lobby=self.mock_server.lobby, gameflow_phase="Lobby")
                     return {"success": True, "action": action, "queueId": qid}
-                return {"success": False, "action": action, "queueId": qid}
+                # The commonest cause is a queue Riot has rotated out: the client reports those
+                # as PlatformDisabled and refuses to open a lobby for them.
+                return {
+                    "success": False,
+                    "action": action,
+                    "queueId": qid,
+                    "error": "That game mode is not available right now",
+                }
 
             elif action in ("SET_POSITIONS", "SET_POSITION_PREFERENCES", "LOBBY_POSITIONS"):
                 first = str(payload.get("first", payload.get("firstPreference", "FILL")))

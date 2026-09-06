@@ -728,7 +728,9 @@
 
   function handleActionResult(result) {
     if (result && result.success === false) {
-      showToast('Action failed on the League Client', 'error');
+      // Actions that know why they failed say so; the rest fall back to something a player
+      // can act on rather than naming the API that refused.
+      showToast(result.error || 'The League client turned that down', 'error');
     }
   }
 
