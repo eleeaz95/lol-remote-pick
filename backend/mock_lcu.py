@@ -802,10 +802,10 @@ class MockLCUServer:
         self.champ_select["benchEnabled"] = True
         # The cards nobody claimed roll into the shared bench alongside the rest of the pool
         leftovers = [cid for cid in self.subset_champion_ids if cid != claimed]
+        # A pool this size is what the real mode offers, and what makes the panel scroll
+        pool_ids = [51, 8, 89, 84, 236, 43, 245, 17, 25, 122, 55, 40, 267, 21, 111]
         self.champ_select["benchChampions"] = [{"championId": cid, "isPriority": True} for cid in leftovers] + [
-            {"championId": 51, "isPriority": False},
-            {"championId": 8, "isPriority": False},
-            {"championId": 89, "isPriority": False},
+            {"championId": cid, "isPriority": False} for cid in pool_ids
         ]
 
         await self.broadcast_event("/lol-champ-select/v1/session", self.champ_select)
