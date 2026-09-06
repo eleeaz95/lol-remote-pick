@@ -842,6 +842,9 @@
     // 2. Entering Champ Select
     if (currPhase === 'CHAMP_SELECT' && prevPhase !== 'CHAMP_SELECT') {
       requestWakeLock();
+      // New session: never carry over the champion selected in a previous champ select
+      localState.selectedChampionId =
+        state.champSelect.myPickIntent || state.champSelect.mySelection.selectedChampionId || 0;
     }
 
     // 3. Your Turn in Champ Select
