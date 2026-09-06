@@ -640,8 +640,22 @@
   // State Normalization & Transition Handling
   // =========================================================================
 
+  function handleActionResult(result) {
+    if (result && result.success === false) {
+      showToast('Action failed on the League Client', 'error');
+    }
+  }
+
   function handleServerMessage(data) {
     if (!data) return;
+
+    // Non-state envelopes (e.g. action_result) carry no phase field.
+    // Never run them through state normalization, or the missing phase
+    // would be read as DISCONNECTED and kick the UI to the retry screen.
+    if (data.type && data.type !== 'state') {
+      if (data.type === 'action_result') handleActionResult(data.data);
+      return;
+    }
 
     // Direct state payload or wrapped
     const payload = data.type === 'state' ? data.payload : (data.state || data);
@@ -650,8 +664,8 @@
     state.connected = payload.connected !== undefined ? Boolean(payload.connected) : state.connected;
     state.mock = Boolean(payload.mock);
 
-    // Phase normalization
-    let nextPhase = (payload.phase || 'DISCONNECTED').toUpperCase();
+    // Phase normalization (keep the current phase if the payload omits one)
+    let nextPhase = (payload.phase || state.phase || 'DISCONNECTED').toUpperCase();
     if (!state.connected && nextPhase !== 'NONE' && nextPhase !== 'LOBBY' && nextPhase !== 'IN_QUEUE' && nextPhase !== 'READY_CHECK' && nextPhase !== 'CHAMP_SELECT' && nextPhase !== 'IN_GAME') {
       nextPhase = 'DISCONNECTED';
     }
