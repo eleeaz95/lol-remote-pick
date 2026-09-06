@@ -620,11 +620,27 @@
   // =========================================================================
 
   function connectWebSocket() {
+    // This attempt supersedes any pending one, otherwise the timer below fires
+    // later and tears down the socket we are about to open.
+    if (localState.reconnectTimeout) {
+      clearTimeout(localState.reconnectTimeout);
+      localState.reconnectTimeout = null;
+    }
+
     if (localState.ws) {
-      try {
-        localState.ws.close();
-      } catch (e) {}
+      const stale = localState.ws;
       localState.ws = null;
+      // Detach the handlers before closing: a healthy socket closed here would
+      // otherwise reach onclose and schedule a reconnect, which closes the next
+      // socket in turn and loops forever.
+      stale.onopen = null;
+      stale.onmessage = null;
+      stale.onclose = null;
+      stale.onerror = null;
+      try {
+        stale.close();
+      } catch (e) {}
+      localState.wsConnected = false;
     }
 
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -635,6 +651,7 @@
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
+        if (localState.ws !== ws) return;
         localState.wsConnected = true;
         localState.reconnectAttempts = 0;
         updateConnectionBadge(true, state.mock);
@@ -651,11 +668,13 @@
       };
 
       ws.onclose = () => {
+        if (localState.ws !== ws) return;
         localState.wsConnected = false;
         scheduleReconnect();
       };
 
       ws.onerror = () => {
+        if (localState.ws !== ws) return;
         localState.wsConnected = false;
       };
 
@@ -668,6 +687,7 @@
 
   function scheduleReconnect() {
     if (localState.reconnectTimeout) return;
+    if (localState.wsConnected) return;
     localState.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(1.5, localState.reconnectAttempts - 1), 8000);
 
