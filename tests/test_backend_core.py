@@ -615,3 +615,27 @@ async def test_security_cors_policy():
             "/api/state", headers={"Origin": "https://malicious-site.com", "Access-Control-Request-Method": "GET"}
         )
         assert resp.headers.get("access-control-allow-credentials") != "true"
+
+
+async def test_lcu_client_treats_every_2xx_as_success():
+    """The live client answers 201 to position-preferences; only 200/204 used to count."""
+    import httpx
+
+    from backend.lcu_client import LCUClient
+
+    client = LCUClient()
+
+    class _Stub(LCUClient):
+        def __init__(self, status):
+            super().__init__()
+            self._status = status
+
+        async def request(self, method, endpoint, **kwargs):
+            return httpx.Response(self._status, request=httpx.Request(method, "http://x" + endpoint))
+
+    assert await _Stub(201).set_position_preferences("MIDDLE", "BOTTOM") is not None
+    assert await _Stub(204).set_position_preferences("MIDDLE", "BOTTOM") is not None
+    assert await _Stub(400).set_position_preferences("MIDDLE", "BOTTOM") is None
+    assert await _Stub(201).start_queue() is True
+    assert await _Stub(500).start_queue() is False
+    await client.close()

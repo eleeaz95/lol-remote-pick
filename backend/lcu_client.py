@@ -134,14 +134,14 @@ class LCUClient:
     async def create_lobby(self, queue_id: int) -> Optional[Dict[str, Any]]:
         """Create a new lobby with specified queue ID (e.g., 420 for Ranked Solo, 400 for Normal Draft, 450 for ARAM)."""
         res = await self.request("POST", "/lol-lobby/v2/lobby", json={"queueId": queue_id})
-        if res and res.status_code in (200, 201):
+        if res and res.is_success:
             return res.json()
         return None
 
     async def delete_lobby(self) -> bool:
         """Leave or delete current lobby."""
         res = await self.request("DELETE", "/lol-lobby/v2/lobby")
-        return bool(res and res.status_code in (200, 204))
+        return bool(res and res.is_success)
 
     async def set_position_preferences(self, first: str, second: str) -> Optional[Dict[str, Any]]:
         """Set lane/position preferences for local lobby member (e.g. 'TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'FILL')."""
@@ -150,19 +150,19 @@ class LCUClient:
             "secondPreference": second.upper(),
         }
         res = await self.request("PUT", "/lol-lobby/v2/lobby/members/localMember/position-preferences", json=payload)
-        if res and res.status_code in (200, 204):
+        if res and res.is_success:
             return res.json() if res.content else {}
         return None
 
     async def start_queue(self) -> bool:
         """Start matchmaking queue search."""
         res = await self.request("POST", "/lol-lobby/v2/lobby/matchmaking/search")
-        return bool(res and res.status_code in (200, 204))
+        return bool(res and res.is_success)
 
     async def cancel_queue(self) -> bool:
         """Cancel matchmaking queue search."""
         res = await self.request("DELETE", "/lol-lobby/v2/lobby/matchmaking/search")
-        return bool(res and res.status_code in (200, 204))
+        return bool(res and res.is_success)
 
     # --- Ready Check (Match Acceptance) ---
 
@@ -176,12 +176,12 @@ class LCUClient:
     async def accept_ready_check(self) -> bool:
         """Accept match ready check."""
         res = await self.request("POST", "/lol-matchmaking/v1/ready-check/accept")
-        return bool(res and res.status_code in (200, 204))
+        return bool(res and res.is_success)
 
     async def decline_ready_check(self) -> bool:
         """Decline match ready check."""
         res = await self.request("POST", "/lol-matchmaking/v1/ready-check/declined")
-        return bool(res and res.status_code in (200, 204))
+        return bool(res and res.is_success)
 
     # --- Champion Select Endpoints ---
 
@@ -199,7 +199,7 @@ class LCUClient:
             "completed": completed,
         }
         res = await self.request("PATCH", f"/lol-champ-select/v1/session/actions/{action_id}", json=payload)
-        return bool(res and res.status_code in (200, 204))
+        return bool(res and res.is_success)
 
     async def patch_my_selection(
         self,
@@ -220,12 +220,12 @@ class LCUClient:
             return True
 
         res = await self.request("PATCH", "/lol-champ-select/v1/session/my-selection", json=payload)
-        return bool(res and res.status_code in (200, 204))
+        return bool(res and res.is_success)
 
     async def bench_swap(self, champion_id: int) -> bool:
         """Swap the local player's champion with one from the shared bench (ARAM-like modes)."""
         res = await self.request("POST", f"/lol-champ-select/v1/session/bench/swap/{champion_id}")
-        return bool(res and res.status_code in (200, 204))
+        return bool(res and res.is_success)
 
     async def get_subset_champion_list(self) -> List[int]:
         """Fetch pickable subset champion IDs in card-selection modes (ARAM / Mayhem)."""
