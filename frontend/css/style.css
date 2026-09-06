@@ -1426,6 +1426,47 @@ body.hextech-theme {
   object-fit: cover;
 }
 
+/* The star rides on top of the splash, so it carries its own scrim to stay readable over
+   whatever art is underneath. Its hit area is deliberately larger than the icon. */
+.champ-fav-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: linear-gradient(225deg, rgba(5, 12, 22, 0.85) 40%, rgba(5, 12, 22, 0) 100%);
+  color: rgba(240, 230, 210, 0.5);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.champ-fav-icon {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.champ-fav-btn[aria-pressed='true'] {
+  color: var(--gold-bright);
+}
+
+.champ-fav-btn[aria-pressed='true'] .champ-fav-icon {
+  fill: currentColor;
+  filter: drop-shadow(0 0 4px rgba(200, 170, 110, 0.8));
+}
+
+.champ-fav-btn:active {
+  transform: scale(0.85);
+}
+
 .champ-card-name {
   width: 100%;
   background: rgba(5, 12, 22, 0.95);

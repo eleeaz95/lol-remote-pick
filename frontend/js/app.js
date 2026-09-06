@@ -5,6 +5,11 @@
 (function () {
   'use strict';
 
+  // Favourites live on the phone that marks them: they are a per-player convenience and the
+  // League client has nowhere to keep them. Declared up here because the state below reads it
+  // while initialising, which a later const would not survive.
+  const FAVORITES_STORAGE_KEY = 'lol_favorite_champions';
+
   // =========================================================================
   // Application State
   // =========================================================================
@@ -85,6 +90,7 @@
     selectedSpellSlot: 1, // 1 for D, 2 for F
     activeRoleFilter: 'ALL',
     searchQuery: '',
+    favoriteChampionIds: loadFavoriteChampions(),
     soundEnabled: localStorage.getItem('lol_sound_enabled') !== 'false',
     wakeLock: null,
     ws: null,
@@ -1753,6 +1759,54 @@
   }
 
   // Champion Grid & Search Rendering
+  function loadFavoriteChampions() {
+    try {
+      const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
+      const ids = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(ids) ? ids.map(Number).filter((id) => id > 0) : []);
+    } catch (e) {
+      // Private windows and blocked site data both throw on access
+      return new Set();
+    }
+  }
+
+  function persistFavoriteChampions() {
+    try {
+      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify([...localState.favoriteChampionIds]));
+    } catch (e) {
+      // Nothing to do: the favourites still hold for the rest of this session
+    }
+  }
+
+  function isFavoriteChampion(championId) {
+    return localState.favoriteChampionIds.has(Number(championId));
+  }
+
+  function toggleFavoriteChampion(champ, card) {
+    const id = Number(champ.id);
+    if (!id) return;
+
+    const nowFavorite = !isFavoriteChampion(id);
+    if (nowFavorite) {
+      localState.favoriteChampionIds.add(id);
+    } else {
+      localState.favoriteChampionIds.delete(id);
+    }
+    persistFavoriteChampions();
+    playClickSound();
+
+    // Restyle in place instead of re-sorting: the grid must not slide out from under the finger
+    // while several champions are being marked. The new order applies the next time it is built.
+    if (card) {
+      card.classList.toggle('is-favorite', nowFavorite);
+      const btn = card.querySelector('.champ-fav-btn');
+      if (btn) {
+        btn.setAttribute('aria-pressed', String(nowFavorite));
+        btn.setAttribute('aria-label', (nowFavorite ? 'Unfavorite ' : 'Favorite ') + champ.name);
+      }
+    }
+  }
+
   // The role tabs are labelled with the client's position names; the champion catalog names the
   // same lanes its own way, so MID and UTILITY need translating or those tabs come up empty.
   const ROLE_TAB_TO_LANE = {
@@ -1781,20 +1835,37 @@
       return matchesSearch && matchesRole;
     });
 
+    // Favourites lead, everyone else follows, alphabetical within each group. Together with the
+    // role tabs that is the point of the feature: filter to your lane, your champions are on top.
+    filtered.sort((a, b) => {
+      const rank = (isFavoriteChampion(a.id) ? 0 : 1) - (isFavoriteChampion(b.id) ? 0 : 1);
+      return rank || a.name.localeCompare(b.name);
+    });
+
     filtered.forEach((champ) => {
       const card = document.createElement('div');
       const isSelected = localState.selectedChampionId === champ.id;
       const isBanned = cs.bans.myTeamBans.includes(champ.id) || cs.bans.theirTeamBans.includes(champ.id);
+      const isFavorite = isFavoriteChampion(champ.id);
 
-      card.className = `champ-card ${isSelected ? 'selected' : ''} ${isBanMode && isSelected ? 'ban-mode' : ''} ${isBanned ? 'banned' : ''}`;
+      card.className = `champ-card ${isSelected ? 'selected' : ''} ${isBanMode && isSelected ? 'ban-mode' : ''} ${isBanned ? 'banned' : ''} ${isFavorite ? 'is-favorite' : ''}`;
       card.setAttribute('data-champ-id', champ.id);
 
       card.innerHTML = `
         <div class="champ-img-box">
           <img class="champ-img" src="${getChampionIconUrl(champ.key)}" alt="${escapeHtml(champ.name)}" loading="lazy">
         </div>
+        <button class="champ-fav-btn" type="button" aria-pressed="${isFavorite}" aria-label="${isFavorite ? 'Unfavorite' : 'Favorite'} ${escapeHtml(champ.name)}">
+          <svg class="champ-fav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9z"/></svg>
+        </button>
         <span class="champ-card-name">${escapeHtml(champ.name)}</span>
       `;
+
+      card.querySelector('.champ-fav-btn').addEventListener('click', (event) => {
+        // The card underneath selects a champion; the star must not do both
+        event.stopPropagation();
+        toggleFavoriteChampion(champ, card);
+      });
 
       card.addEventListener('click', () => {
         onChampionCardClick(champ);
