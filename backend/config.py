@@ -1,12 +1,14 @@
 """Application configuration settings."""
 
-import os
 import sys
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional, List
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List, Optional
+
 from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
 class Settings(BaseSettings):
     """Global configuration settings for LoL Remote Pick."""
 
@@ -31,11 +33,7 @@ class Settings(BaseSettings):
     # Optional custom path for League of Legends lockfile / install
     custom_league_path: Optional[str] = Field(default=None, description="Custom path to LoL installation or lockfile")
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     def get_static_path(self) -> Path:
         """Resolve frontend static directory path, supporting dev and frozen PyInstaller bundles."""
@@ -60,6 +58,7 @@ class Settings(BaseSettings):
             return frontend_dist
         frontend_dir = base_dir / "frontend"
         return frontend_dir
+
 
 @lru_cache()
 def get_settings() -> Settings:

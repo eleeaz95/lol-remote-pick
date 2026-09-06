@@ -1,7 +1,8 @@
 """Asynchronous HTTP client for League Client (LCU) REST API."""
 
 import logging
-from typing import Optional, Any, Dict, List
+from typing import Any, Dict, List, Optional
+
 import httpx
 
 from .lcu_connector import LCUCredentials
@@ -191,12 +192,7 @@ class LCUClient:
             return res.json()
         return None
 
-    async def patch_champ_select_action(
-        self,
-        action_id: int,
-        champion_id: int,
-        completed: bool = False
-    ) -> bool:
+    async def patch_champ_select_action(self, action_id: int, champion_id: int, completed: bool = False) -> bool:
         """Hover (completed=False) or lock in/ban (completed=True) a champion."""
         payload = {
             "championId": champion_id,
@@ -270,6 +266,7 @@ class LCUClient:
         if res and res.status_code == 200:
             return res.json()
         return []
+
     async def get_champions_data(self) -> List[Dict[str, Any]]:
         """Fetch full champion summary from local game data service."""
         res = await self.request("GET", "/lol-game-data/assets/v1/champion-summary.json")

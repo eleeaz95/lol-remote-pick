@@ -1,15 +1,14 @@
 """League Client (LCU) discovery and credential management."""
 
 import base64
+import logging
 import os
 import re
-import string
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, List, Set
-import logging
+from typing import List, Optional
 
 try:
     import psutil
@@ -26,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LCUCredentials:
     """Connection credentials and URLs for the League Client."""
+
     port: int
     password: str
     protocol: str = "https"
@@ -172,9 +172,21 @@ class LCUConnector:
             (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Riot Games, Inc\League of Legends", "Location"),
             (winreg.HKEY_CURRENT_USER, r"Software\Riot Games\League of Legends", "Location"),
             (winreg.HKEY_CURRENT_USER, r"Software\Riot Games\League of Legends", "Path"),
-            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Riot Game league_of_legends.live", "InstallLocation"),
-            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Riot Game league_of_legends.live", "InstallLocation"),
-            (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Riot Game league_of_legends.live", "InstallLocation"),
+            (
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Riot Game league_of_legends.live",
+                "InstallLocation",
+            ),
+            (
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Riot Game league_of_legends.live",
+                "InstallLocation",
+            ),
+            (
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Riot Game league_of_legends.live",
+                "InstallLocation",
+            ),
         ]
 
         for hive, subkey, val_name in reg_queries:
@@ -291,11 +303,7 @@ class LCUConnector:
                 password = parts[3]
                 protocol = parts[4]
                 return LCUCredentials(
-                    port=port,
-                    password=password,
-                    protocol=protocol,
-                    pid=pid,
-                    process_name=process_name
+                    port=port, password=password, protocol=protocol, pid=pid, process_name=process_name
                 )
         except Exception as e:
             logger.debug(f"Failed to parse lockfile content: {e}")
@@ -395,7 +403,15 @@ class LCUConnector:
         """Windows fallback to query LeagueClientUx process command line using WMIC / PowerShell."""
         try:
             # Try WMIC first (fast command-line query on Windows)
-            cmd = ["wmic", "process", "where", "name like 'LeagueClientUx%'", "get", "CommandLine,ProcessId", "/format:csv"]
+            cmd = [
+                "wmic",
+                "process",
+                "where",
+                "name like 'LeagueClientUx%'",
+                "get",
+                "CommandLine,ProcessId",
+                "/format:csv",
+            ]
             result = subprocess.run(
                 cmd,
                 capture_output=True,

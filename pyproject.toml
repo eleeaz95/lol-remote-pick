@@ -23,6 +23,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "pyinstaller>=6.5.0",
+    "ruff>=0.6.0",
 ]
 
 [tool.pytest.ini_options]
@@ -33,3 +34,17 @@ pythonpath = ["."]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["backend*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B"]
+# The formatter already caps code width; E501 would only fire on strings and
+# comments it cannot split (LCU endpoint paths, champion data literals).
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# run.py bootstraps sys.path before importing backend, and pads the ASCII banner.
+"run.py" = ["E402", "W291"]

@@ -4,8 +4,9 @@ phase determination, event handling, data normalization, and subscriber broadcas
 """
 
 import asyncio
-import pytest
 from typing import Any, Dict, List
+
+import pytest
 
 from backend.state_engine import StateEngine
 
@@ -191,8 +192,8 @@ async def test_state_engine_champ_select_full_flow():
     champ_select_data = {
         "localPlayerCellId": 0,
         "bans": {
-            "myTeamBans": [266], # Aatrox
-            "theirTeamBans": [103], # Ahri
+            "myTeamBans": [266],  # Aatrox
+            "theirTeamBans": [103],  # Ahri
             "numBans": 2,
         },
         "myTeam": [
@@ -201,14 +202,14 @@ async def test_state_engine_champ_select_full_flow():
                 "summonerId": 12345678,
                 "assignedPosition": "middle",
                 "championId": 0,
-                "spell1Id": 4, # Flash
-                "spell2Id": 14, # Ignite
+                "spell1Id": 4,  # Flash
+                "spell2Id": 14,  # Ignite
             },
             {
                 "cellId": 1,
                 "summonerId": 87654321,
                 "assignedPosition": "jungle",
-                "championId": 64, # Lee Sin
+                "championId": 64,  # Lee Sin
                 "spell1Id": 4,
                 "spell2Id": 11,
             },
@@ -240,13 +241,13 @@ async def test_state_engine_champ_select_full_flow():
                     "isInProgress": False,
                     "completed": False,
                 }
-            ]
+            ],
         ],
         "timer": {
             "phase": "BAN_PICK",
             "adjustedTimeLeftInPhase": 25.0,
             "totalTimeInPhase": 30.0,
-        }
+        },
     }
 
     await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
@@ -283,7 +284,7 @@ async def test_state_engine_champ_select_full_flow():
     champ_select_data["actions"][0][0]["championId"] = 266
 
     champ_select_data["actions"][1][0]["isInProgress"] = True
-    champ_select_data["actions"][1][0]["championId"] = 157 # Hover Yasuo
+    champ_select_data["actions"][1][0]["championId"] = 157  # Hover Yasuo
 
     await engine.handle_lcu_event("/lol-champ-select/v1/session", champ_select_data)
 
@@ -295,8 +296,8 @@ async def test_state_engine_champ_select_full_flow():
 
     # 3. Update my selection (spells & lock)
     my_selection_data = {
-        "spell1Id": 4, # Flash
-        "spell2Id": 12, # Teleport
+        "spell1Id": 4,  # Flash
+        "spell2Id": 12,  # Teleport
         "selectedChampionId": 157,
     }
     await engine.handle_lcu_event("/lol-champ-select/v1/session/my-selection", my_selection_data)
@@ -356,10 +357,13 @@ async def test_state_engine_smooth_lobby_recreation():
 
     # 1. Enter Lobby with Draft (400)
     await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "Lobby")
-    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {
-        "gameConfig": {"queueId": 400},
-        "members": [{"summonerName": "Player1", "isLeader": True, "isLocalMember": True}]
-    })
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/lobby",
+        {
+            "gameConfig": {"queueId": 400},
+            "members": [{"summonerName": "Player1", "isLeader": True, "isLocalMember": True}],
+        },
+    )
     state1 = engine.get_state()
     assert state1["phase"] == "LOBBY"
     assert state1["lobby"]["queueId"] == 400
@@ -372,10 +376,13 @@ async def test_state_engine_smooth_lobby_recreation():
     assert state_transient["lobby"]["queueId"] == 400
 
     # 3. New lobby arrives within grace window (e.g. ARAM 450)
-    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {
-        "gameConfig": {"queueId": 450},
-        "members": [{"summonerName": "Player1", "isLeader": True, "isLocalMember": True}]
-    })
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/lobby",
+        {
+            "gameConfig": {"queueId": 450},
+            "members": [{"summonerName": "Player1", "isLeader": True, "isLocalMember": True}],
+        },
+    )
     state2 = engine.get_state()
     assert state2["phase"] == "LOBBY"
     assert state2["lobby"]["queueId"] == 450
@@ -386,14 +393,16 @@ async def test_state_engine_smooth_lobby_recreation():
     assert state_none["phase"] == "NONE"
     assert state_none["lobby"]["members"] == []
 
+
 @pytest.mark.asyncio
 async def test_state_engine_server_time_and_emission_deduplication():
     """Verify serverTime is attached and redundant state emissions are deduplicated."""
-    import time
+
     engine = StateEngine()
     engine.set_connected(True)
 
     emissions = []
+
     async def on_change(state):
         emissions.append(state)
 
@@ -406,45 +415,56 @@ async def test_state_engine_server_time_and_emission_deduplication():
     assert st["serverTime"] > 0
 
     # 1. Update with initial summoner data -> should trigger emission
-    await engine.handle_lcu_event("/lol-summoner/v1/current-summoner", {
-        "displayName": "Hide on bush",
-        "summonerId": 999,
-        "profileIconId": 1,
-        "summonerLevel": 100,
-    })
+    await engine.handle_lcu_event(
+        "/lol-summoner/v1/current-summoner",
+        {
+            "displayName": "Hide on bush",
+            "summonerId": 999,
+            "profileIconId": 1,
+            "summonerLevel": 100,
+        },
+    )
     await asyncio.sleep(0.05)
     assert len(emissions) == 1
     assert emissions[0]["summoner"]["displayName"] == "Hide on bush"
     assert "serverTime" in emissions[0]
 
     # 2. Update with identical summoner data -> deduplicated, no new emission!
-    await engine.handle_lcu_event("/lol-summoner/v1/current-summoner", {
-        "displayName": "Hide on bush",
-        "summonerId": 999,
-        "profileIconId": 1,
-        "summonerLevel": 100,
-    })
+    await engine.handle_lcu_event(
+        "/lol-summoner/v1/current-summoner",
+        {
+            "displayName": "Hide on bush",
+            "summonerId": 999,
+            "profileIconId": 1,
+            "summonerLevel": 100,
+        },
+    )
     await asyncio.sleep(0.05)
     assert len(emissions) == 1
 
     # 3. Update with new summoner data -> triggers emission
-    await engine.handle_lcu_event("/lol-summoner/v1/current-summoner", {
-        "displayName": "T1 Faker",
-        "summonerId": 999,
-        "profileIconId": 6,
-        "summonerLevel": 500,
-    })
+    await engine.handle_lcu_event(
+        "/lol-summoner/v1/current-summoner",
+        {
+            "displayName": "T1 Faker",
+            "summonerId": 999,
+            "profileIconId": 6,
+            "summonerLevel": 500,
+        },
+    )
     await asyncio.sleep(0.05)
     assert len(emissions) == 2
     assert emissions[1]["summoner"]["displayName"] == "T1 Faker"
 
     # 4. update_from_poll with identical data -> deduplicated!
-    engine.update_from_poll(summoner={
-        "displayName": "T1 Faker",
-        "summonerId": 999,
-        "profileIconId": 6,
-        "summonerLevel": 500,
-    })
+    engine.update_from_poll(
+        summoner={
+            "displayName": "T1 Faker",
+            "summonerId": 999,
+            "profileIconId": 6,
+            "summonerLevel": 500,
+        }
+    )
     await asyncio.sleep(0.05)
     assert len(emissions) == 2
 
@@ -456,25 +476,37 @@ async def test_state_engine_bench_mode_champ_select():
     engine.set_connected(True)
 
     await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
-    await engine.handle_lcu_event("/lol-champ-select/v1/session", {
-        "localPlayerCellId": 0,
-        "benchEnabled": True,
-        "benchChampions": [
-            {"championId": 22, "isPriority": True},
-            {"championId": 51, "isPriority": False},
-            {"championId": 0, "isPriority": False},
-        ],
-        "bans": {"myTeamBans": [], "theirTeamBans": []},
-        "myTeam": [
-            {"cellId": 0, "championId": 32, "spell1Id": 4, "spell2Id": 32},
-            {"cellId": 1, "championId": 64, "spell1Id": 4, "spell2Id": 32},
-        ],
-        "theirTeam": [{"cellId": 5, "championId": 0}],
-        "mySelection": {"spell1Id": 4, "spell2Id": 32, "selectedChampionId": 32},
-        "actions": [
-            [{"id": 1, "actorCellId": 0, "championId": 32, "type": "pick", "isInProgress": False, "completed": True}]
-        ],
-    })
+    await engine.handle_lcu_event(
+        "/lol-champ-select/v1/session",
+        {
+            "localPlayerCellId": 0,
+            "benchEnabled": True,
+            "benchChampions": [
+                {"championId": 22, "isPriority": True},
+                {"championId": 51, "isPriority": False},
+                {"championId": 0, "isPriority": False},
+            ],
+            "bans": {"myTeamBans": [], "theirTeamBans": []},
+            "myTeam": [
+                {"cellId": 0, "championId": 32, "spell1Id": 4, "spell2Id": 32},
+                {"cellId": 1, "championId": 64, "spell1Id": 4, "spell2Id": 32},
+            ],
+            "theirTeam": [{"cellId": 5, "championId": 0}],
+            "mySelection": {"spell1Id": 4, "spell2Id": 32, "selectedChampionId": 32},
+            "actions": [
+                [
+                    {
+                        "id": 1,
+                        "actorCellId": 0,
+                        "championId": 32,
+                        "type": "pick",
+                        "isInProgress": False,
+                        "completed": True,
+                    }
+                ]
+            ],
+        },
+    )
 
     cs = engine.get_state()["champSelect"]
     assert cs["pickMode"] == "BENCH"
@@ -495,18 +527,24 @@ async def test_state_engine_bench_mode_inferred_from_aram_queue():
     engine = StateEngine()
     engine.set_connected(True)
 
-    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {
-        "gameConfig": {"queueId": 450, "gameMode": "ARAM"},
-        "members": [],
-        "localMember": {"isLeader": True},
-    })
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/lobby",
+        {
+            "gameConfig": {"queueId": 450, "gameMode": "ARAM"},
+            "members": [],
+            "localMember": {"isLeader": True},
+        },
+    )
     await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
-    await engine.handle_lcu_event("/lol-champ-select/v1/session", {
-        "localPlayerCellId": 0,
-        "myTeam": [{"cellId": 0, "championId": 32}],
-        "theirTeam": [],
-        "actions": [],
-    })
+    await engine.handle_lcu_event(
+        "/lol-champ-select/v1/session",
+        {
+            "localPlayerCellId": 0,
+            "myTeam": [{"cellId": 0, "championId": 32}],
+            "theirTeam": [],
+            "actions": [],
+        },
+    )
 
     cs = engine.get_state()["champSelect"]
     assert cs["pickMode"] == "BENCH"
@@ -519,20 +557,26 @@ async def test_state_engine_draft_queue_keeps_draft_pick_mode():
     engine = StateEngine()
     engine.set_connected(True)
 
-    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {
-        "gameConfig": {"queueId": 420, "gameMode": "CLASSIC"},
-        "members": [],
-        "localMember": {"isLeader": True},
-    })
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/lobby",
+        {
+            "gameConfig": {"queueId": 420, "gameMode": "CLASSIC"},
+            "members": [],
+            "localMember": {"isLeader": True},
+        },
+    )
     await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
-    await engine.handle_lcu_event("/lol-champ-select/v1/session", {
-        "localPlayerCellId": 0,
-        "myTeam": [{"cellId": 0, "championId": 0}],
-        "theirTeam": [],
-        "actions": [
-            [{"id": 1, "actorCellId": 0, "championId": 0, "type": "ban", "isInProgress": True, "completed": False}]
-        ],
-    })
+    await engine.handle_lcu_event(
+        "/lol-champ-select/v1/session",
+        {
+            "localPlayerCellId": 0,
+            "myTeam": [{"cellId": 0, "championId": 0}],
+            "theirTeam": [],
+            "actions": [
+                [{"id": 1, "actorCellId": 0, "championId": 0, "type": "ban", "isInProgress": True, "completed": False}]
+            ],
+        },
+    )
 
     cs = engine.get_state()["champSelect"]
     assert cs["pickMode"] == "DRAFT"
@@ -546,22 +590,28 @@ async def test_state_engine_aram_normal_with_bench_enabled_false():
     engine = StateEngine()
     engine.set_connected(True)
 
-    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {
-        "gameConfig": {"queueId": 450, "gameMode": "ARAM"},
-        "members": [],
-        "localMember": {"isLeader": True},
-    })
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/lobby",
+        {
+            "gameConfig": {"queueId": 450, "gameMode": "ARAM"},
+            "members": [],
+            "localMember": {"isLeader": True},
+        },
+    )
     # Lobby deleted when entering champ select
     await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
     await engine.handle_lcu_event("/lol-lobby/v2/lobby", None, event_type="Delete")
-    await engine.handle_lcu_event("/lol-champ-select/v1/session", {
-        "localPlayerCellId": 0,
-        "benchEnabled": False,
-        "benchChampions": [],
-        "myTeam": [{"cellId": 0, "championId": 32}],
-        "theirTeam": [],
-        "actions": [],
-    })
+    await engine.handle_lcu_event(
+        "/lol-champ-select/v1/session",
+        {
+            "localPlayerCellId": 0,
+            "benchEnabled": False,
+            "benchChampions": [],
+            "myTeam": [{"cellId": 0, "championId": 32}],
+            "theirTeam": [],
+            "actions": [],
+        },
+    )
 
     cs = engine.get_state()["champSelect"]
     assert cs["pickMode"] == "BENCH"
@@ -575,24 +625,30 @@ async def test_state_engine_aram_mayhem_queue_2400():
     engine = StateEngine()
     engine.set_connected(True)
 
-    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {
-        "gameConfig": {"queueId": 2400, "gameMode": "KIWI"},
-        "members": [],
-        "localMember": {"isLeader": True},
-    })
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/lobby",
+        {
+            "gameConfig": {"queueId": 2400, "gameMode": "KIWI"},
+            "members": [],
+            "localMember": {"isLeader": True},
+        },
+    )
     await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
-    await engine.handle_lcu_event("/lol-champ-select/v1/session", {
-        "localPlayerCellId": 0,
-        "benchEnabled": True,
-        "benchChampions": [
-            {"championId": 22, "isPriority": True},
-            {"championId": 141, "isPriority": True},
-            {"championId": 51, "isPriority": False},
-        ],
-        "myTeam": [{"cellId": 0, "championId": 32}],
-        "theirTeam": [],
-        "actions": [],
-    })
+    await engine.handle_lcu_event(
+        "/lol-champ-select/v1/session",
+        {
+            "localPlayerCellId": 0,
+            "benchEnabled": True,
+            "benchChampions": [
+                {"championId": 22, "isPriority": True},
+                {"championId": 141, "isPriority": True},
+                {"championId": 51, "isPriority": False},
+            ],
+            "myTeam": [{"cellId": 0, "championId": 32}],
+            "theirTeam": [],
+            "actions": [],
+        },
+    )
 
     cs = engine.get_state()["champSelect"]
     assert cs["pickMode"] == "BENCH"

@@ -13,16 +13,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import socket
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 from fastapi import (
     FastAPI,
     HTTPException,
-    Request,
     WebSocket,
     WebSocketDisconnect,
     status,
@@ -36,14 +33,11 @@ from .champ_data import (
     get_all_champions,
     get_all_queues,
     get_all_spells,
-    get_champion_by_id,
-    get_queue_by_id,
-    get_spell_by_id,
     init_champ_data,
 )
 from .config import Settings, get_settings
 from .lcu_client import LCUClient
-from .lcu_connector import LCUConnector, LCUCredentials
+from .lcu_connector import LCUConnector
 from .lcu_ws import LCUWebSocket
 from .mock_lcu import MockLCUServer
 from .state_engine import StateEngine
@@ -94,6 +88,7 @@ class MockPhaseRequest(BaseModel):
 # Network & QR Code Utilities
 # ---------------------------------------------------------------------------
 
+
 def get_all_lan_ips() -> List[Dict[str, Any]]:
     """
     Discovers all active LAN IPv4 addresses on the host system,
@@ -105,6 +100,7 @@ def get_all_lan_ips() -> List[Dict[str, Any]]:
     # 1. Inspect interfaces via psutil if available
     try:
         import psutil
+
         addrs = psutil.net_if_addrs()
         stats = psutil.net_if_stats() if hasattr(psutil, "net_if_stats") else {}
 
@@ -118,9 +114,20 @@ def get_all_lan_ips() -> List[Dict[str, Any]]:
             is_virtual = any(
                 v in lower_name
                 for v in [
-                    "virtual", "vbox", "vmware", "wsl", "vethernet", "docker",
-                    "tailscale", "zerotier", "hamachi", "loopback", "bluetooth",
-                    "npcap", "teredo", "isatap"
+                    "virtual",
+                    "vbox",
+                    "vmware",
+                    "wsl",
+                    "vethernet",
+                    "docker",
+                    "tailscale",
+                    "zerotier",
+                    "hamachi",
+                    "loopback",
+                    "bluetooth",
+                    "npcap",
+                    "teredo",
+                    "isatap",
                 ]
             )
 
@@ -145,13 +152,15 @@ def get_all_lan_ips() -> List[Dict[str, Any]]:
                         iface_type = "Network"
                         priority = 50
 
-                    results.append({
-                        "ip": ip,
-                        "interface": iface_name,
-                        "type": iface_type,
-                        "is_virtual": is_virtual,
-                        "priority": priority,
-                    })
+                    results.append(
+                        {
+                            "ip": ip,
+                            "interface": iface_name,
+                            "type": iface_type,
+                            "is_virtual": is_virtual,
+                            "priority": priority,
+                        }
+                    )
     except Exception as e:
         logger.debug(f"psutil network interface inspection failed: {e}")
 
@@ -164,13 +173,15 @@ def get_all_lan_ips() -> List[Dict[str, Any]]:
         if route_ip and not route_ip.startswith("127.") and not route_ip.startswith("169.254."):
             if route_ip not in seen_ips:
                 seen_ips.add(route_ip)
-                results.append({
-                    "ip": route_ip,
-                    "interface": "Default Gateway Route",
-                    "type": "LAN",
-                    "is_virtual": False,
-                    "priority": 80,
-                })
+                results.append(
+                    {
+                        "ip": route_ip,
+                        "interface": "Default Gateway Route",
+                        "type": "LAN",
+                        "is_virtual": False,
+                        "priority": 80,
+                    }
+                )
             else:
                 # Boost priority of the routed IP if it's not virtual
                 for item in results:
@@ -186,25 +197,29 @@ def get_all_lan_ips() -> List[Dict[str, Any]]:
             for ip in host_ips:
                 if not ip.startswith("127.") and not ip.startswith("169.254.") and ip not in seen_ips:
                     seen_ips.add(ip)
-                    results.append({
-                        "ip": ip,
-                        "interface": "Local Adapter",
-                        "type": "LAN",
-                        "is_virtual": False,
-                        "priority": 60,
-                    })
+                    results.append(
+                        {
+                            "ip": ip,
+                            "interface": "Local Adapter",
+                            "type": "LAN",
+                            "is_virtual": False,
+                            "priority": 60,
+                        }
+                    )
         except Exception:
             pass
 
     # Fallback to localhost if no LAN IP was found
     if not results:
-        results.append({
-            "ip": "127.0.0.1",
-            "interface": "Loopback",
-            "type": "Localhost",
-            "is_virtual": False,
-            "priority": 0,
-        })
+        results.append(
+            {
+                "ip": "127.0.0.1",
+                "interface": "Loopback",
+                "type": "Localhost",
+                "is_virtual": False,
+                "priority": 0,
+            }
+        )
 
     results.sort(key=lambda x: x.get("priority", 0), reverse=True)
     return results
@@ -219,6 +234,8 @@ def get_best_lan_ip() -> str:
 def get_local_ip() -> str:
     """Compatibility alias for get_best_lan_ip."""
     return get_best_lan_ip()
+
+
 def generate_ascii_qr(url: str) -> str:
     """
     Renders a compact, high-contrast ASCII/Unicode block QR code for terminal display.
@@ -263,6 +280,7 @@ def generate_svg_qr(url: str) -> str:
     """Generates an inline SVG string for the QR code to display in web UI."""
     try:
         import io
+
         import qrcode
         import qrcode.image.svg
 
@@ -274,6 +292,7 @@ def generate_svg_qr(url: str) -> str:
     except Exception as e:
         logger.debug("SVG QR generation failed: %s", e)
         return ""
+
 
 # ---------------------------------------------------------------------------
 # Application State & Hub Manager
@@ -295,6 +314,7 @@ class AppHub:
         self.background_tasks: List[asyncio.Task] = []
         self._is_running = False
         self._last_broadcast_payload: Optional[Dict[str, Any]] = None
+
     async def broadcast_state(self, state: Dict[str, Any]) -> None:
         """Broadcast normalized state JSON to all connected mobile WebSockets."""
         if not self.active_websockets:
@@ -321,6 +341,7 @@ class AppHub:
 
         for ws in dead_sockets:
             self.active_websockets.discard(ws)
+
     async def _on_state_engine_change(self, state: Dict[str, Any]) -> None:
         """Callback registered with StateEngine."""
         await self.broadcast_state(state)
@@ -405,13 +426,18 @@ class AppHub:
                             else:
                                 consecutive_failures += 1
                                 if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
-                                    logger.warning("League Client unresponsive (%d consecutive failed polls)", consecutive_failures)
+                                    logger.warning(
+                                        "League Client unresponsive (%d consecutive failed polls)", consecutive_failures
+                                    )
                                     last_had_creds = False
                                     self.state_engine.set_connected(False)
                     else:
                         consecutive_failures += 1
                         if last_had_creds and consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
-                            logger.warning("League Client disconnected or closed (%d consecutive failed polls)", consecutive_failures)
+                            logger.warning(
+                                "League Client disconnected or closed (%d consecutive failed polls)",
+                                consecutive_failures,
+                            )
                             last_had_creds = False
                             self.state_engine.set_connected(False)
             except asyncio.CancelledError:
@@ -420,6 +446,7 @@ class AppHub:
                 logger.debug("LCU poll loop exception: %s", exc)
 
             await asyncio.sleep(self.settings.lcu_poll_interval)
+
     async def start(self) -> None:
         """Initialize all backend components and background tasks."""
         self._is_running = True
@@ -551,7 +578,13 @@ class AppHub:
                 champion_id = int(payload.get("championId", 0))
                 completed = bool(payload.get("completed", True))
                 success = await self.lcu_client.patch_champ_select_action(action_id, champion_id, completed=completed)
-                return {"success": success, "action": action, "actionId": action_id, "championId": champion_id, "completed": completed}
+                return {
+                    "success": success,
+                    "action": action,
+                    "actionId": action_id,
+                    "championId": champion_id,
+                    "completed": completed,
+                }
 
             elif action in ("CHAMP_HOVER", "HOVER", "CHAMP_SELECT_HOVER", "PRESELECT", "PICK_INTENT"):
                 action_id = int(payload.get("actionId", 0))
@@ -590,10 +623,7 @@ class AppHub:
 
                 cs_state = self.state_engine.get_state().get("champSelect", {})
                 bench_entries = cs_state.get("bench") or []
-                allowed_ids = {
-                    int(e.get("championId", 0) if isinstance(e, dict) else e)
-                    for e in bench_entries
-                }
+                allowed_ids = {int(e.get("championId", 0) if isinstance(e, dict) else e) for e in bench_entries}
                 if allowed_ids and champion_id not in allowed_ids:
                     return {"success": False, "action": action, "error": "Champion is not in bench pool"}
 
@@ -709,7 +739,6 @@ def create_app(custom_settings: Optional[Settings] = None) -> FastAPI:
         st["mock"] = bool(hub.mock_server is not None)
         return st
 
-
     @app.get("/api/network-info")
     async def get_network_info():
         """Returns LAN connection URLs, QR code SVG, and network interfaces."""
@@ -722,14 +751,16 @@ def create_app(custom_settings: Optional[Settings] = None) -> FastAPI:
         interfaces = []
         for item in all_ips:
             ip = item["ip"]
-            interfaces.append({
-                "ip": ip,
-                "url": f"http://{ip}:{port}",
-                "interface": item.get("interface", "Network"),
-                "type": item.get("type", "LAN"),
-                "is_virtual": item.get("is_virtual", False),
-                "is_primary": (ip == primary_ip),
-            })
+            interfaces.append(
+                {
+                    "ip": ip,
+                    "url": f"http://{ip}:{port}",
+                    "interface": item.get("interface", "Network"),
+                    "type": item.get("type", "LAN"),
+                    "is_virtual": item.get("is_virtual", False),
+                    "is_primary": (ip == primary_ip),
+                }
+            )
 
         return {
             "primary_ip": primary_ip,
@@ -739,6 +770,7 @@ def create_app(custom_settings: Optional[Settings] = None) -> FastAPI:
             "qr_svg": svg_qr,
             "interfaces": interfaces,
         }
+
     @app.get("/api/champions")
     async def get_champions(role: Optional[str] = None, search: Optional[str] = None):
         """Returns catalog of League champions with role/search filtering."""

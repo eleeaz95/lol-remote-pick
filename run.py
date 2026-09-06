@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import socket
 import sys
 from pathlib import Path
@@ -21,12 +20,15 @@ CURRENT_DIR = Path(__file__).resolve().parent
 if str(CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(CURRENT_DIR))
 
-import uvicorn
 import threading
 import time
 import webbrowser
+
+import uvicorn
+
 from backend.config import Settings
-from backend.server import create_app, generate_ascii_qr, get_all_lan_ips, get_best_lan_ip, get_local_ip
+from backend.server import create_app, generate_ascii_qr, get_all_lan_ips, get_best_lan_ip
+
 
 def is_port_available(host: str, port: int) -> bool:
     """Checks if a TCP port is available to bind."""
@@ -44,12 +46,16 @@ def find_available_port(host: str, preferred_port: int, max_attempts: int = 10) 
     if is_port_available(host, preferred_port):
         return preferred_port
 
-    logger.warning("Port %d is already in use by another application. Searching for next available port...", preferred_port)
+    logger.warning(
+        "Port %d is already in use by another application. Searching for next available port...", preferred_port
+    )
     for p in range(preferred_port + 1, preferred_port + max_attempts):
         if is_port_available(host, p):
             logger.info("Found available port: %d", p)
             return p
     return preferred_port
+
+
 # Configure logging format
 logging.basicConfig(
     level=logging.INFO,
@@ -89,25 +95,26 @@ def print_banner(host: str, port: int, mock_mode: bool, local_ip: str) -> None:
     if alt_urls:
         banner += " [OTHER LAN IPs]:\n" + "\n".join(alt_urls) + "\n"
 
-    banner += rf"""================================================================================
+    banner += r"""================================================================================
  📱 Scan QR Code with your Smartphone Camera (same Wi-Fi network):
 """
     print(banner)
     qr_ascii = generate_ascii_qr(lan_url)
     print(qr_ascii)
-    print("""
+    print(
+        """
  💡 Tips for sharing & mobile connection on Windows:
     1. Make sure your smartphone and PC are connected to the SAME Wi-Fi network.
     2. If your phone cannot open the page, allow Python / port in Windows Firewall.
     3. Open http://localhost:{port} on your PC to see the in-app QR code & lobby.
 ================================================================================
-""".replace("{port}", str(port)))
+""".replace("{port}", str(port))
+    )
+
 
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="LoL Remote Pick - Control League of Legends from your phone"
-    )
+    parser = argparse.ArgumentParser(description="LoL Remote Pick - Control League of Legends from your phone")
     parser.add_argument(
         "--host",
         type=str,
@@ -115,7 +122,8 @@ def parse_args() -> argparse.Namespace:
         help="Host address to bind the server (default: 0.0.0.0)",
     )
     parser.add_argument(
-        "-p", "--port",
+        "-p",
+        "--port",
         type=int,
         default=8000,
         help="Port to run the web server on (default: 8000)",
@@ -193,12 +201,14 @@ def main() -> None:
     )
 
     if args.open_browser:
+
         def _delayed_open():
             time.sleep(1.0)
             try:
                 webbrowser.open(f"http://localhost:{settings.port}")
             except Exception:
                 pass
+
         threading.Thread(target=_delayed_open, daemon=True).start()
 
     app = create_app(settings)
@@ -210,6 +220,7 @@ def main() -> None:
         log_level="info",
         access_log=True,
     )
+
 
 if __name__ == "__main__":
     main()

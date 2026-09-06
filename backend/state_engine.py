@@ -4,7 +4,7 @@ import asyncio
 import copy
 import logging
 import time
-from typing import Dict, Any, List, Optional, Callable, Awaitable, Set
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,7 @@ QUEUE_NAMES = {
 
 # Queues whose champion select uses random assignment + shared bench instead of pick/ban draft
 BENCH_QUEUE_IDS = {450, 720, 721, 2400, 2450, 3220, 3270, 3280}
+
 
 def _extract_bench(session: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Normalize the shared champion bench, accepting object or plain-id LCU payloads."""
@@ -108,6 +109,7 @@ class StateEngine:
         # Cached normalized state & emission deduplication
         self._cached_state: Optional[Dict[str, Any]] = None
         self._last_emitted_state: Optional[Dict[str, Any]] = None
+
     def subscribe(self, callback: StateCallback) -> None:
         """Register a callback for state changes."""
         if callback not in self._listeners:
@@ -133,6 +135,7 @@ class StateEngine:
                     await res
             except Exception as e:
                 logger.error(f"Error in state change listener: {e}", exc_info=True)
+
     def set_connected(self, connected: bool, immediate: bool = False) -> None:
         """Update connection status with debounced disconnect support."""
         if connected:
@@ -187,6 +190,7 @@ class StateEngine:
             await self._emit_state_change()
         except asyncio.CancelledError:
             pass
+
     async def handle_lcu_event(self, uri: str, data: Any, event_type: str = "Update") -> None:
         """Process incoming LCU WebSocket event and update internal state."""
         async with self._lock:
@@ -240,7 +244,12 @@ class StateEngine:
                     if qname:
                         self._active_queue_name = str(qname)
                 state_changed = True
-            elif "/lol-matchmaking/v1/search" in uri or "matchmaking/search" in uri or "search-state" in uri or "/lobby/matchmaking" in uri:
+            elif (
+                "/lol-matchmaking/v1/search" in uri
+                or "matchmaking/search" in uri
+                or "search-state" in uri
+                or "/lobby/matchmaking" in uri
+            ):
                 if event_type == "Delete":
                     self._raw_queue = None
                 elif isinstance(data, dict):
@@ -293,7 +302,9 @@ class StateEngine:
                 if event_type == "Delete":
                     self._raw_champ_select = None
                 elif isinstance(data, dict):
-                    old_my_selection = self._raw_champ_select.get("mySelection") if isinstance(self._raw_champ_select, dict) else None
+                    old_my_selection = (
+                        self._raw_champ_select.get("mySelection") if isinstance(self._raw_champ_select, dict) else None
+                    )
                     self._raw_champ_select = data
                     if old_my_selection and "mySelection" not in data:
                         self._raw_champ_select["mySelection"] = old_my_selection
@@ -362,6 +373,7 @@ class StateEngine:
 
         self._cached_state = None
         asyncio.create_task(self._emit_state_change())
+
     def get_state(self) -> Dict[str, Any]:
         """Compute and return the normalized root state dictionary."""
         if self._cached_state is not None:
@@ -438,11 +450,7 @@ class StateEngine:
                 "profileIconId": 0,
                 "summonerLevel": 1,
             }
-        display_name = (
-            self._raw_summoner.get("displayName")
-            or self._raw_summoner.get("gameName")
-            or ""
-        )
+        display_name = self._raw_summoner.get("displayName") or self._raw_summoner.get("gameName") or ""
         tag_line = self._raw_summoner.get("tagLine")
         if tag_line and "#" not in display_name and display_name:
             display_name = f"{display_name}#{tag_line}"
@@ -485,18 +493,20 @@ class StateEngine:
 
             summoner_name = m.get("summonerName") or m.get("summonerInternalName") or ""
 
-            members_normalized.append({
-                "summonerId": m.get("summonerId", 0),
-                "summonerName": summoner_name,
-                "firstPositionPreference": first_pref,
-                "secondPositionPreference": second_pref,
-                "positionPreferences": {
-                    "first": first_pref,
-                    "second": second_pref,
-                },
-                "isLeader": is_leader,
-                "isLocalMember": is_local,
-            })
+            members_normalized.append(
+                {
+                    "summonerId": m.get("summonerId", 0),
+                    "summonerName": summoner_name,
+                    "firstPositionPreference": first_pref,
+                    "secondPositionPreference": second_pref,
+                    "positionPreferences": {
+                        "first": first_pref,
+                        "second": second_pref,
+                    },
+                    "isLeader": is_leader,
+                    "isLocalMember": is_local,
+                }
+            )
 
         can_start = self._raw_lobby.get("canStartActivity", is_local_leader)
 
@@ -605,9 +615,7 @@ class StateEngine:
             gameflow = self._raw_gameflow_session or {}
             gf_queue = (gameflow.get("gameData") or {}).get("queue") or {}
             gf_map = gameflow.get("map") or {}
-            gmode = str(
-                game_config.get("gameMode") or gf_queue.get("gameMode") or gf_map.get("gameMode") or ""
-            ).upper()
+            gmode = str(game_config.get("gameMode") or gf_queue.get("gameMode") or gf_map.get("gameMode") or "").upper()
 
         qname = (self._active_queue_name or "").upper()
         if not qname:
@@ -686,7 +694,7 @@ class StateEngine:
         timer_norm = {
             "phase": timer_phase,
             "adjustedTimeLeftInPhase": max(0.0, time_left),
-            "totalTimeInPhase": max(0.0, total_total := total_time),
+            "totalTimeInPhase": max(0.0, total_time),
         }
 
         # 2. Actions & Turn calculation
@@ -762,7 +770,7 @@ class StateEngine:
         local_pick_intent = 0
         for m in session.get("myTeam", []):
             cid = m.get("cellId", -1)
-            is_local = (cid == local_cell_id)
+            is_local = cid == local_cell_id
             locked_champ_id = m.get("championId", 0) or 0
             pick_intent_id = m.get("championPickIntent", 0) or 0
             is_locked = bool(locked_champ_id > 0)
@@ -771,29 +779,33 @@ class StateEngine:
             if is_local:
                 local_pick_intent = pick_intent_id or (0 if is_locked else locked_champ_id)
 
-            my_team.append({
-                "cellId": cid,
-                "summonerName": m.get("summonerName") or m.get("displayName") or f"Player {cid}",
-                "assignedPosition": m.get("assignedPosition", ""),
-                "championId": locked_champ_id,
-                "championPickIntent": pick_intent_id,
-                "displayedChampionId": displayed_champ,
-                "isLocked": is_locked,
-                "isPickIntent": bool(pick_intent_id > 0 and not is_locked),
-                "spell1Id": m.get("spell1Id", 0),
-                "spell2Id": m.get("spell2Id", 0),
-                "isLocalPlayer": is_local,
-            })
+            my_team.append(
+                {
+                    "cellId": cid,
+                    "summonerName": m.get("summonerName") or m.get("displayName") or f"Player {cid}",
+                    "assignedPosition": m.get("assignedPosition", ""),
+                    "championId": locked_champ_id,
+                    "championPickIntent": pick_intent_id,
+                    "displayedChampionId": displayed_champ,
+                    "isLocked": is_locked,
+                    "isPickIntent": bool(pick_intent_id > 0 and not is_locked),
+                    "spell1Id": m.get("spell1Id", 0),
+                    "spell2Id": m.get("spell2Id", 0),
+                    "isLocalPlayer": is_local,
+                }
+            )
 
         # 5. Their Team parsing
         their_team = []
         for m in session.get("theirTeam", []):
             cid = m.get("cellId", -1)
-            their_team.append({
-                "cellId": cid,
-                "assignedPosition": m.get("assignedPosition", ""),
-                "championId": m.get("championId", 0),
-            })
+            their_team.append(
+                {
+                    "cellId": cid,
+                    "assignedPosition": m.get("assignedPosition", ""),
+                    "championId": m.get("championId", 0),
+                }
+            )
 
         # 6. My Selection
         my_selection_raw = session.get("mySelection", {})

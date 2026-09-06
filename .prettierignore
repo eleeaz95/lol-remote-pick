@@ -1,0 +1,2 @@
+# index.html is hand-formatted; Prettier rewraps its attributes far too aggressively.
+frontend/index.html

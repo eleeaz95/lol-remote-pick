@@ -67,6 +67,22 @@ uv run pytest
 
 ---
 
+## 🎨 Linting & Formatting
+
+Python is formatted and linted with [Ruff](https://docs.astral.sh/ruff/), and the frontend JS/CSS with
+[Prettier](https://prettier.io/). Both are enforced in CI, so run them before opening a PR:
+
+```bash
+# Python (installed with the dev extras):
+ruff format .
+ruff check --fix .
+
+# Frontend JS & CSS (Node only needed for this; index.html is intentionally excluded):
+npx prettier --write "frontend/**/*.{js,css}"
+```
+
+---
+
 ## 📝 Commit Conventions
 
 We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
