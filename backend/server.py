@@ -678,18 +678,28 @@ class AppHub:
                 if allowed_ids and champion_id not in allowed_ids:
                     return {"success": False, "action": action, "error": "Champion is not in bench pool"}
 
-                success = await self.lcu_client.bench_swap(champion_id)
-                if not success:
-                    # Fallback for card-selection subphases where bench swap endpoint is not yet active
-                    act_id = 0
-                    if cs_state.get("activeAction"):
-                        act_id = int(cs_state["activeAction"].get("id", 0))
-                    elif cs_state.get("localPickActionId"):
-                        act_id = int(cs_state.get("localPickActionId", 0))
-                    if act_id:
-                        success = await self.lcu_client.patch_champ_select_action(act_id, champion_id, completed=True)
+                act_id = 0
+                if cs_state.get("activeAction"):
+                    act_id = int(cs_state["activeAction"].get("id", 0))
+                elif cs_state.get("localPickActionId"):
+                    act_id = int(cs_state.get("localPickActionId", 0))
+
+                # While the pick action is still open the player is choosing one of the cards they
+                # were dealt, and the bench does not exist yet: completing that action is what
+                # claims the card. Swapping only applies once a champion is already assigned.
+                picking_a_card = bool(act_id) and not cs_state.get("localPickCompleted", False)
+
+                if picking_a_card:
+                    success = await self.lcu_client.patch_champ_select_action(act_id, champion_id, completed=True)
                     if not success:
-                        success = await self.lcu_client.patch_my_selection(champion_id=champion_id)
+                        success = await self.lcu_client.bench_swap(champion_id)
+                else:
+                    success = await self.lcu_client.bench_swap(champion_id)
+                    if not success and act_id:
+                        success = await self.lcu_client.patch_champ_select_action(act_id, champion_id, completed=True)
+
+                if not success:
+                    success = await self.lcu_client.patch_my_selection(champion_id=champion_id)
                 return {"success": success, "action": action, "championId": champion_id}
             elif action in ("GET_STATE", "PING"):
                 state = self.state_engine.get_state()

@@ -844,6 +844,7 @@ class StateEngine:
             "pickMode": "DRAFT",
             "benchEnabled": False,
             "bench": [],
+            "localPickCompleted": False,
         }
 
         if not self._raw_champ_select:
@@ -873,6 +874,7 @@ class StateEngine:
         active_action = None
         action_phase = "NONE"
         local_pick_action_id = None
+        local_pick_completed = False
         local_ban_action_id = None
 
         # Discover all actions and search for local player active action
@@ -891,6 +893,7 @@ class StateEngine:
                 if actor_cell == local_cell_id:
                     if act_type == "PICK" and local_pick_action_id is None:
                         local_pick_action_id = action.get("id")
+                        local_pick_completed = bool(is_completed)
                     elif act_type == "BAN" and local_ban_action_id is None:
                         local_ban_action_id = action.get("id")
 
@@ -1007,6 +1010,7 @@ class StateEngine:
             "actionPhase": action_phase,
             "activeAction": active_action,
             "localPickActionId": local_pick_action_id,
+            "localPickCompleted": local_pick_completed,
             "localBanActionId": local_ban_action_id,
             "myPickIntent": local_pick_intent,
             "timer": timer_norm,

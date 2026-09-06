@@ -636,3 +636,63 @@ async def test_lcu_client_treats_every_2xx_as_success():
     assert await _Stub(201).start_queue() is True
     assert await _Stub(500).start_queue() is False
     await client.close()
+
+
+@pytest.mark.asyncio
+async def test_card_pick_completes_the_action_instead_of_swapping():
+    """Claiming a dealt card must go through the open pick action.
+
+    The bench swap endpoint belongs to the later pool phase; asking it to claim a card leaves the
+    player with nothing, and a client that answers it with a success status hides the failure.
+    """
+    from unittest.mock import AsyncMock
+
+    from backend.server import AppHub
+
+    hub = AppHub(Settings(mock_mode=False))
+    engine = hub.state_engine
+    engine.set_connected(True)
+
+    await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
+    await engine.handle_lcu_event(
+        "/lol-champ-select/v1/session",
+        {
+            "localPlayerCellId": 0,
+            "allowSubsetChampionPicks": True,
+            "benchChampions": [],
+            "myTeam": [{"cellId": 0, "championId": 0, "summonerName": "Me"}],
+            "theirTeam": [],
+            "actions": [[{"id": 7, "actorCellId": 0, "type": "pick", "completed": False, "isInProgress": True}]],
+        },
+    )
+    engine.set_subset_champion_ids([63, 99, 45])
+
+    hub.lcu_client.bench_swap = AsyncMock(return_value=True)
+    hub.lcu_client.patch_champ_select_action = AsyncMock(return_value=True)
+    hub.lcu_client.patch_my_selection = AsyncMock(return_value=True)
+
+    res = await hub.execute_action("BENCH_SWAP", {"championId": 99})
+
+    assert res["success"] is True
+    hub.lcu_client.patch_champ_select_action.assert_awaited_once_with(7, 99, completed=True)
+    hub.lcu_client.bench_swap.assert_not_awaited()
+
+    # Once the pick is locked in, the same tap is a bench swap again
+    await engine.handle_lcu_event(
+        "/lol-champ-select/v1/session",
+        {
+            "localPlayerCellId": 0,
+            "benchEnabled": True,
+            "benchChampions": [{"championId": 51, "isPriority": False}],
+            "myTeam": [{"cellId": 0, "championId": 99, "summonerName": "Me"}],
+            "theirTeam": [],
+            "actions": [[{"id": 7, "actorCellId": 0, "type": "pick", "championId": 99, "completed": True}]],
+        },
+    )
+
+    hub.lcu_client.patch_champ_select_action.reset_mock()
+    res2 = await hub.execute_action("BENCH_SWAP", {"championId": 51})
+
+    assert res2["success"] is True
+    hub.lcu_client.bench_swap.assert_awaited_once_with(51)
+    hub.lcu_client.patch_champ_select_action.assert_not_awaited()
