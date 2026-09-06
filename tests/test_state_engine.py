@@ -447,3 +447,156 @@ async def test_state_engine_server_time_and_emission_deduplication():
     })
     await asyncio.sleep(0.05)
     assert len(emissions) == 2
+
+
+@pytest.mark.asyncio
+async def test_state_engine_bench_mode_champ_select():
+    """Verify ARAM-like sessions expose BENCH pick mode and a normalized shared bench."""
+    engine = StateEngine()
+    engine.set_connected(True)
+
+    await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
+    await engine.handle_lcu_event("/lol-champ-select/v1/session", {
+        "localPlayerCellId": 0,
+        "benchEnabled": True,
+        "benchChampions": [
+            {"championId": 22, "isPriority": True},
+            {"championId": 51, "isPriority": False},
+            {"championId": 0, "isPriority": False},
+        ],
+        "bans": {"myTeamBans": [], "theirTeamBans": []},
+        "myTeam": [
+            {"cellId": 0, "championId": 32, "spell1Id": 4, "spell2Id": 32},
+            {"cellId": 1, "championId": 64, "spell1Id": 4, "spell2Id": 32},
+        ],
+        "theirTeam": [{"cellId": 5, "championId": 0}],
+        "mySelection": {"spell1Id": 4, "spell2Id": 32, "selectedChampionId": 32},
+        "actions": [
+            [{"id": 1, "actorCellId": 0, "championId": 32, "type": "pick", "isInProgress": False, "completed": True}]
+        ],
+    })
+
+    cs = engine.get_state()["champSelect"]
+    assert cs["pickMode"] == "BENCH"
+    assert cs["benchEnabled"] is True
+    # Invalid ids dropped, priority flag preserved
+    assert cs["bench"] == [
+        {"championId": 22, "isPriority": True},
+        {"championId": 51, "isPriority": False},
+    ]
+    # No ban phase and no turn to act in bench modes
+    assert cs["isMyTurn"] is False
+    assert cs["bans"]["myTeamBans"] == []
+
+
+@pytest.mark.asyncio
+async def test_state_engine_bench_mode_inferred_from_aram_queue():
+    """Verify ARAM queues fall back to BENCH mode before the bench is populated."""
+    engine = StateEngine()
+    engine.set_connected(True)
+
+    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {
+        "gameConfig": {"queueId": 450, "gameMode": "ARAM"},
+        "members": [],
+        "localMember": {"isLeader": True},
+    })
+    await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
+    await engine.handle_lcu_event("/lol-champ-select/v1/session", {
+        "localPlayerCellId": 0,
+        "myTeam": [{"cellId": 0, "championId": 32}],
+        "theirTeam": [],
+        "actions": [],
+    })
+
+    cs = engine.get_state()["champSelect"]
+    assert cs["pickMode"] == "BENCH"
+    assert cs["bench"] == []
+
+
+@pytest.mark.asyncio
+async def test_state_engine_draft_queue_keeps_draft_pick_mode():
+    """Verify draft queues are never treated as bench modes."""
+    engine = StateEngine()
+    engine.set_connected(True)
+
+    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {
+        "gameConfig": {"queueId": 420, "gameMode": "CLASSIC"},
+        "members": [],
+        "localMember": {"isLeader": True},
+    })
+    await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
+    await engine.handle_lcu_event("/lol-champ-select/v1/session", {
+        "localPlayerCellId": 0,
+        "myTeam": [{"cellId": 0, "championId": 0}],
+        "theirTeam": [],
+        "actions": [
+            [{"id": 1, "actorCellId": 0, "championId": 0, "type": "ban", "isInProgress": True, "completed": False}]
+        ],
+    })
+
+    cs = engine.get_state()["champSelect"]
+    assert cs["pickMode"] == "DRAFT"
+    assert cs["benchEnabled"] is False
+    assert cs["actionPhase"] == "BAN"
+
+
+@pytest.mark.asyncio
+async def test_state_engine_aram_normal_with_bench_enabled_false():
+    """Verify normal ARAM (450) is still BENCH pickMode even if LCU session sends benchEnabled: False."""
+    engine = StateEngine()
+    engine.set_connected(True)
+
+    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {
+        "gameConfig": {"queueId": 450, "gameMode": "ARAM"},
+        "members": [],
+        "localMember": {"isLeader": True},
+    })
+    # Lobby deleted when entering champ select
+    await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
+    await engine.handle_lcu_event("/lol-lobby/v2/lobby", None, event_type="Delete")
+    await engine.handle_lcu_event("/lol-champ-select/v1/session", {
+        "localPlayerCellId": 0,
+        "benchEnabled": False,
+        "benchChampions": [],
+        "myTeam": [{"cellId": 0, "championId": 32}],
+        "theirTeam": [],
+        "actions": [],
+    })
+
+    cs = engine.get_state()["champSelect"]
+    assert cs["pickMode"] == "BENCH"
+    assert cs["benchEnabled"] is True
+    assert cs["isMyTurn"] is False
+
+
+@pytest.mark.asyncio
+async def test_state_engine_aram_mayhem_queue_2400():
+    """Verify ARAM: Mayhem (queue 2400, mode KIWI) is recognized as BENCH mode."""
+    engine = StateEngine()
+    engine.set_connected(True)
+
+    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {
+        "gameConfig": {"queueId": 2400, "gameMode": "KIWI"},
+        "members": [],
+        "localMember": {"isLeader": True},
+    })
+    await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
+    await engine.handle_lcu_event("/lol-champ-select/v1/session", {
+        "localPlayerCellId": 0,
+        "benchEnabled": True,
+        "benchChampions": [
+            {"championId": 22, "isPriority": True},
+            {"championId": 141, "isPriority": True},
+            {"championId": 51, "isPriority": False},
+        ],
+        "myTeam": [{"cellId": 0, "championId": 32}],
+        "theirTeam": [],
+        "actions": [],
+    })
+
+    cs = engine.get_state()["champSelect"]
+    assert cs["pickMode"] == "BENCH"
+    assert cs["benchEnabled"] is True
+    assert len(cs["bench"]) == 3
+    assert cs["bench"][0]["championId"] == 22
+    assert cs["bench"][0]["isPriority"] is True

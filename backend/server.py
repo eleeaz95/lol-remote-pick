@@ -81,6 +81,10 @@ class ChampSelectSpellsRequest(BaseModel):
     selectedChampionId: Optional[int] = Field(default=None, description="Optional selected champion ID")
 
 
+class ChampSelectBenchSwapRequest(BaseModel):
+    championId: int = Field(..., description="Champion ID from the shared bench to swap into")
+
+
 class MockPhaseRequest(BaseModel):
     phase: str = Field(..., description="Phase name (None, Lobby, Matchmaking, ReadyCheck, ChampSelect, InProgress)")
     queueId: Optional[int] = Field(default=420, description="Queue ID for lobby simulation")
@@ -353,6 +357,11 @@ class AppHub:
                                 lobby = await self.lcu_client.get_lobby()
                                 ready_check = await self.lcu_client.get_ready_check()
                                 champ_select = await self.lcu_client.get_champ_select_session()
+                                gameflow_session = await self.lcu_client.get_gameflow_session()
+                                if champ_select is not None and champ_select.get("allowSubsetChampionPicks"):
+                                    subset = await self.lcu_client.get_subset_champion_list()
+                                    if subset:
+                                        champ_select["subsetChampionIds"] = subset
 
                                 self.state_engine.update_from_poll(
                                     phase=phase,
@@ -360,6 +369,7 @@ class AppHub:
                                     lobby=lobby,
                                     ready_check=ready_check,
                                     champ_select=champ_select,
+                                    gameflow_session=gameflow_session,
                                 )
                                 self.state_engine.set_connected(True)
                         elif self.lcu_ws.is_connected:
@@ -377,6 +387,11 @@ class AppHub:
                                 lobby = await self.lcu_client.get_lobby()
                                 ready_check = await self.lcu_client.get_ready_check()
                                 champ_select = await self.lcu_client.get_champ_select_session()
+                                gameflow_session = await self.lcu_client.get_gameflow_session()
+                                if champ_select is not None and champ_select.get("allowSubsetChampionPicks"):
+                                    subset = await self.lcu_client.get_subset_champion_list()
+                                    if subset:
+                                        champ_select["subsetChampionIds"] = subset
 
                                 self.state_engine.update_from_poll(
                                     phase=phase,
@@ -384,6 +399,7 @@ class AppHub:
                                     lobby=lobby,
                                     ready_check=ready_check,
                                     champ_select=champ_select,
+                                    gameflow_session=gameflow_session,
                                 )
                                 self.state_engine.set_connected(True)
                             else:
@@ -567,6 +583,33 @@ class AppHub:
                 success = await self.lcu_client.patch_my_selection(spell1_id=s1_id, spell2_id=s2_id, champion_id=c_id)
                 return {"success": success, "action": action}
 
+            elif action in ("BENCH_SWAP", "CHAMP_SELECT_BENCH_SWAP", "SWAP_BENCH"):
+                champion_id = int(payload.get("championId", 0))
+                if champion_id <= 0:
+                    return {"success": False, "action": action, "error": "championId is required"}
+
+                cs_state = self.state_engine.get_state().get("champSelect", {})
+                bench_entries = cs_state.get("bench") or []
+                allowed_ids = {
+                    int(e.get("championId", 0) if isinstance(e, dict) else e)
+                    for e in bench_entries
+                }
+                if allowed_ids and champion_id not in allowed_ids:
+                    return {"success": False, "action": action, "error": "Champion is not in bench pool"}
+
+                success = await self.lcu_client.bench_swap(champion_id)
+                if not success:
+                    # Fallback for card-selection subphases where bench swap endpoint is not yet active
+                    act_id = 0
+                    if cs_state.get("activeAction"):
+                        act_id = int(cs_state["activeAction"].get("id", 0))
+                    elif cs_state.get("localPickActionId"):
+                        act_id = int(cs_state.get("localPickActionId", 0))
+                    if act_id:
+                        success = await self.lcu_client.patch_champ_select_action(act_id, champion_id, completed=True)
+                    if not success:
+                        success = await self.lcu_client.patch_my_selection(champion_id=champion_id)
+                return {"success": success, "action": action, "championId": champion_id}
             elif action in ("GET_STATE", "PING"):
                 state = self.state_engine.get_state()
                 state["mock"] = bool(self.mock_server is not None)
@@ -582,7 +625,7 @@ class AppHub:
                 elif phase.lower() in ("ready_check", "readycheck"):
                     await self.mock_server.trigger_ready_check()
                 elif phase.lower() in ("champ_select", "champselect"):
-                    await self.mock_server.trigger_champ_select()
+                    await self.mock_server.trigger_champ_select(queue_id=qid)
                 elif phase.lower() in ("in_game", "inprogress"):
                     await self.mock_server.trigger_in_game()
                 elif phase.lower() == "none":
@@ -783,6 +826,14 @@ def create_app(custom_settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to set summoner spells")
         return res
 
+    @app.post("/api/champ-select/bench-swap")
+    async def champ_select_bench_swap(body: ChampSelectBenchSwapRequest):
+        """Swaps the local player's champion with one from the shared bench (ARAM-like modes)."""
+        res = await hub.execute_action("BENCH_SWAP", body.model_dump())
+        if not res.get("success"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to swap champion from bench")
+        return res
+
     # Mock helper endpoints
     @app.post("/api/mock/phase")
     async def mock_set_phase(body: MockPhaseRequest):
@@ -862,6 +913,8 @@ def create_app(custom_settings: Optional[Settings] = None) -> FastAPI:
                         action = "CHAMP_HOVER"
                     elif "/api/champ-select/spells" in endpoint:
                         action = "SET_SPELLS"
+                    elif "/api/champ-select/bench-swap" in endpoint:
+                        action = "BENCH_SWAP"
                     elif "/api/state" in endpoint:
                         action = "GET_STATE"
 
