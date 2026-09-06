@@ -469,3 +469,24 @@ async def test_card_selection_champions_arrive_over_the_websocket(mock_app_and_c
     await hub.mock_server.trigger_lobby(queue_id=2400)
     await asyncio.sleep(0.2)
     assert (await client.get("/api/state")).json()["champSelect"]["bench"] == []
+
+
+@pytest.mark.asyncio
+async def test_party_member_names_are_resolved_by_puuid(mock_app_and_client):
+    """Everyone but the local player arrives nameless, so the hub has to look them up."""
+    app, client, hub = mock_app_and_client
+
+    await hub.mock_server.trigger_lobby(queue_id=420)
+
+    members = []
+    for _ in range(40):
+        await asyncio.sleep(0.05)
+        members = (await client.get("/api/state")).json()["lobby"]["members"]
+        if len(members) > 1 and members[1]["summonerName"]:
+            break
+
+    assert len(members) == 2
+    assert members[0]["summonerName"] == "MockSummoner#PBE"
+    assert members[1]["isLocalMember"] is False
+    assert members[1]["summonerName"] == "MockDuo#LAS", "the party member never got named"
+    assert members[1]["profileIconId"] == 4567

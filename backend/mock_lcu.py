@@ -176,6 +176,19 @@ class MockLCUServer:
         self.champ_select: Optional[Dict[str, Any]] = None
         self.game_teams: Optional[Dict[str, Any]] = None
         self.subset_champion_ids: List[int] = [63, 99, 45]
+        # Other players, keyed by puuid. Their names are only reachable through the summoner
+        # lookup: the lobby payload has carried an empty summonerName since the Riot ID migration.
+        self.other_players: Dict[str, Dict[str, Any]] = {
+            "mock-puuid-duo-4444-5555-666666666666": {
+                "puuid": "mock-puuid-duo-4444-5555-666666666666",
+                "gameName": "MockDuo",
+                "tagLine": "LAS",
+                "displayName": "",
+                "profileIconId": 4567,
+                "summonerId": 200000002,
+                "summonerLevel": 87,
+            }
+        }
 
         self._setup_routes()
 
@@ -232,6 +245,15 @@ class MockLCUServer:
         @app.get("/lol-summoner/v1/current-summoner")
         async def get_current_summoner():
             return self.summoner
+
+        @app.get("/lol-summoner/v2/summoners/puuid/{puuid}")
+        async def get_summoner_by_puuid(puuid: str):
+            if puuid == self.summoner["puuid"]:
+                return self.summoner
+            player = self.other_players.get(puuid)
+            if not player:
+                raise HTTPException(status_code=404, detail="Summoner not found")
+            return player
 
         # Gameflow
         @app.get("/lol-gameflow/v1/gameflow-phase")
@@ -486,12 +508,30 @@ class MockLCUServer:
             "members": [
                 {
                     "summonerId": self.summoner["summonerId"],
-                    "summonerName": self.summoner["displayName"],
+                    "puuid": self.summoner["puuid"],
+                    # The client leaves this empty for everyone, you included
+                    "summonerName": "",
+                    "summonerIconId": self.summoner["profileIconId"],
+                    "summonerLevel": self.summoner["summonerLevel"],
                     "isLeader": True,
                     "isLocalMember": True,
                     "firstPositionPreference": "TOP",
                     "secondPositionPreference": "MIDDLE",
-                }
+                },
+                *[
+                    {
+                        "summonerId": player["summonerId"],
+                        "puuid": player["puuid"],
+                        # Empty, exactly as the client sends it for everyone but you
+                        "summonerName": "",
+                        "summonerIconId": player["profileIconId"],
+                        "summonerLevel": player["summonerLevel"],
+                        "isLeader": False,
+                        "firstPositionPreference": "UNSELECTED",
+                        "secondPositionPreference": "UNSELECTED",
+                    }
+                    for player in self.other_players.values()
+                ],
             ],
         }
 
