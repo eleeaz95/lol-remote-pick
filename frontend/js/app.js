@@ -2122,8 +2122,9 @@
   // =========================================================================
 
   function formatTimeSeconds(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const totalSecs = Math.max(0, Math.round(Number(seconds) || 0));
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }
 
