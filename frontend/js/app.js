@@ -1021,20 +1021,25 @@
     if (!badge || !text) return;
 
     const applyBadgeState = (isConn, mock, reconn) => {
-      badge.className = 'connection-badge';
+      let variant = 'disconnected';
+      let label = 'Disconnected from the League client';
       if (reconn) {
-        badge.classList.add('reconnecting');
-        text.textContent = 'Reconnecting...';
+        variant = 'reconnecting';
+        label = 'Reconnecting';
       } else if (mock) {
-        badge.classList.add('mock');
-        text.textContent = 'Mock Mode';
+        variant = 'mock';
+        label = 'Mock mode';
       } else if (isConn) {
-        badge.classList.add('connected');
-        text.textContent = 'LCU Connected';
-      } else {
-        badge.classList.add('disconnected');
-        text.textContent = 'Disconnected';
+        variant = 'connected';
+        label = 'Connected to the League client';
       }
+
+      badge.className = `connection-badge ${variant}`;
+      // The dot alone is the visible indicator; this label is what assistive tech and a
+      // long-press tooltip read, so it stays in sync with the colour.
+      text.textContent = label;
+      badge.title = label;
+      badge.setAttribute('aria-label', label);
     };
 
     if (connected || isMock) {
