@@ -817,3 +817,22 @@ async def test_state_engine_in_game_roster_cleared_after_the_match():
     assert state["phase"] == "LOBBY"
     assert state["inGame"]["myTeam"] == []
     assert state["inGame"]["theirTeam"] == []
+
+
+async def test_state_engine_lobby_reports_whether_the_queue_has_roles():
+    """Random-champion queues expose hasPositions False so the client can drop the selector."""
+    engine = StateEngine()
+    engine.set_connected(True)
+
+    # Ranked Solo: lanes apply
+    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {"gameConfig": {"queueId": 420}, "members": []})
+    assert engine.get_state()["lobby"]["hasPositions"] is True
+
+    # ARAM and ARAM Mayhem: champions are random, there is no lane to prefer
+    for queue_id in (450, 2400):
+        await engine.handle_lcu_event("/lol-lobby/v2/lobby", {"gameConfig": {"queueId": queue_id}, "members": []})
+        assert engine.get_state()["lobby"]["hasPositions"] is False, queue_id
+
+    # An unknown queue keeps the selector rather than hiding a control that may be needed
+    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {"gameConfig": {"queueId": 99999}, "members": []})
+    assert engine.get_state()["lobby"]["hasPositions"] is True

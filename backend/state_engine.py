@@ -6,6 +6,8 @@ import logging
 import time
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
+from .champ_data import get_queue_by_id
+
 logger = logging.getLogger(__name__)
 
 StateCallback = Callable[[Dict[str, Any]], Awaitable[None]]
@@ -474,6 +476,7 @@ class StateEngine:
                 "queueName": "None",
                 "isLeader": False,
                 "canStartQueue": False,
+                "hasPositions": True,
                 "members": [],
             }
 
@@ -529,11 +532,17 @@ class StateEngine:
 
         can_start = self._raw_lobby.get("canStartActivity", is_local_leader)
 
+        # Random-champion and blind queues have no lanes to prefer, so the client should not
+        # offer the choice at all. Unknown queues keep the roles, which is the safer default.
+        queue_meta = get_queue_by_id(queue_id) or {}
+        has_positions = bool(queue_meta.get("hasPositions", True)) and queue_id not in BENCH_QUEUE_IDS
+
         return {
             "queueId": queue_id,
             "queueName": queue_name,
             "isLeader": is_local_leader,
             "canStartQueue": can_start,
+            "hasPositions": has_positions,
             "members": members_normalized,
         }
 

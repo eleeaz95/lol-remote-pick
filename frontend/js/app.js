@@ -23,6 +23,7 @@
       queueName: 'Ranked Solo/Duo',
       isLeader: true,
       canStartQueue: true,
+      hasPositions: true,
       members: [],
     },
     queue: {
@@ -780,6 +781,7 @@
         queueName: payload.lobby.queueName || 'Ranked Solo/Duo',
         isLeader: payload.lobby.isLeader !== undefined ? payload.lobby.isLeader : true,
         canStartQueue: payload.lobby.canStartQueue !== undefined ? payload.lobby.canStartQueue : true,
+        hasPositions: payload.lobby.hasPositions !== undefined ? Boolean(payload.lobby.hasPositions) : true,
         members: Array.isArray(payload.lobby.members) ? payload.lobby.members : [],
       };
     }
@@ -1142,7 +1144,17 @@
   }
 
   // 2. Lobby View
+  function prettyRole(role) {
+    const value = String(role || 'FILL');
+    if (value === 'UNSELECTED' || value === '') return 'Fill';
+    return value.charAt(0) + value.slice(1).toLowerCase();
+  }
+
   function renderLobbyView() {
+    // Modes that assign champions at random have no lanes to prefer. The control is not
+    // disabled but removed: nothing the player could do here would ever make it apply.
+    toggleElementById('position-card', state.lobby.hasPositions !== false);
+
     const queueBadge = document.getElementById('current-queue-badge');
     if (queueBadge) {
       queueBadge.textContent = state.lobby.queueName || 'Ranked Solo/Duo';
@@ -1187,9 +1199,13 @@
             <span class="member-name">${escapeHtml(m.summonerName || 'Summoner')}</span>
             ${m.isLeader ? '<svg class="member-leader-crown" viewBox="0 0 24 24" aria-label="Party leader" role="img"><path d="M3 8l4.5 3.5L12 5l4.5 6.5L21 8l-1.8 10H4.8z"/></svg>' : ''}
           </div>
-          <div class="member-roles">
-            <span>${escapeHtml(m.firstPositionPreference || 'FILL')} / ${escapeHtml(m.secondPositionPreference || 'FILL')}</span>
-          </div>
+          ${
+            state.lobby.hasPositions === false
+              ? ''
+              : `<div class="member-roles">
+            <span>${escapeHtml(prettyRole(m.firstPositionPreference))} / ${escapeHtml(prettyRole(m.secondPositionPreference))}</span>
+          </div>`
+          }
         `;
         membersList.appendChild(row);
       });
@@ -2091,6 +2107,8 @@
 
     if (selectP && selectS) {
       const onRoleChange = () => {
+        if (state.lobby.hasPositions === false) return;
+
         if (pIcon) pIcon.textContent = selectP.value.substring(0, 3);
         if (sIcon) sIcon.textContent = selectS.value.substring(0, 3);
         sendApiRequest('/api/lobby/positions', {
