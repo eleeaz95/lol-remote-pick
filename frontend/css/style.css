@@ -1515,7 +1515,8 @@ body.hextech-theme {
   border-radius: var(--radius-sm);
   box-shadow: 0 0 16px rgba(10, 200, 185, 0.25);
   gap: 4px;
-  animation: pulse-glow 2s infinite ease-in-out;
+  /* pulse-glow never existed, so this banner sat still where it meant to breathe */
+  animation: pulse-cyan 2s infinite ease-in-out;
 }
 
 .choose-banner-title {
