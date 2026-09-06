@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import logging
 import socket
+import subprocess
 import sys
 from pathlib import Path
 
@@ -175,6 +176,25 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _serve_with_reload(args: argparse.Namespace) -> None:
+    """Restart the launcher whenever the backend package changes.
+
+    uvicorn's own --reload is deliberately not used: on Windows its reloader detects the change and
+    logs "Reloading...", but never respawns the worker, so the old code keeps serving. Supervising
+    the process from the outside avoids that. watchfiles ships with uvicorn[standard].
+    """
+    from watchfiles import run_process
+
+    # Drop --reload so the supervised child serves normally instead of supervising in turn.
+    child_argv = [a for a in sys.argv[1:] if a != "--reload"]
+    command = subprocess.list2cmdline([sys.executable, str(CURRENT_DIR / "run.py"), *child_argv])
+
+    logger.info("Auto-reload enabled: watching %s", CURRENT_DIR / "backend")
+    # Only the backend is watched. The frontend is read from disk on every request, so restarting
+    # for those edits would drop every connected phone for nothing.
+    run_process(CURRENT_DIR / "backend", target=command, target_type="command")
+
+
 def main() -> None:
     """Entry point for the launcher."""
     args = parse_args()
@@ -210,6 +230,10 @@ def main() -> None:
                 pass
 
         threading.Thread(target=_delayed_open, daemon=True).start()
+
+    if args.reload:
+        _serve_with_reload(args)
+        return
 
     app = create_app(settings)
 
