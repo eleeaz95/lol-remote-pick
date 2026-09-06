@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#091428">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260906_1">
+  <link rel="stylesheet" href="css/style.css?v=20260906_2">
 </head>
 <body class="hextech-theme">
   <div id="app" class="app-container">
@@ -40,13 +40,13 @@
 
       <div class="header-right">
         <button id="btn-connect-phone" class="icon-btn" title="Connect Phone / QR Code" aria-label="Connect Phone / QR Code">
-          <span class="btn-icon">📱</span>
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3zm2 2v3h3V5zM14 3h7v7h-7zm2 2v3h3V5zM3 14h7v7H3zm2 2v3h3v-3zM14 14h3v3h-3zm5 0h2v2h-2zm-5 5h2v2h-2zm3 0h4v2h-4z"/></svg>
         </button>
         <button id="btn-wakelock" class="icon-btn" title="Screen Wake Lock" aria-label="Screen Wake Lock">
-          <span class="btn-icon">💡</span>
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2zM9.5 20h5a1 1 0 010 2h-5a1 1 0 010-2z"/></svg>
         </button>
         <button id="btn-sound" class="icon-btn active" title="Sound Effects" aria-label="Toggle Sound">
-          <span id="sound-icon" class="btn-icon">🔊</span>
+          <svg id="sound-icon" class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zm12.5 3a4.5 4.5 0 00-2.5-4v8a4.5 4.5 0 002.5-4zm-2.5-8v2a6 6 0 010 12v2a8 8 0 000-16z"/></svg>
         </button>
       </div>
     </header>
@@ -71,10 +71,10 @@
           <p class="standby-desc">Start League of Legends on your PC or launch with Mock Mode to control your lobby remotely.</p>
           <div class="standby-actions">
             <button id="btn-reconnect" class="btn btn-gold">
-              <span class="btn-text">RETRY CONNECTION</span>
+              <span class="btn-text">Retry connection</span>
             </button>
             <button id="btn-standby-qr" class="btn btn-cyan">
-              <span class="btn-text">📱 CONNECT PHONE / QR</span>
+              <span class="btn-text">Connect a phone</span>
             </button>
           </div>
           <div id="reconnect-status" class="reconnect-status">Auto-retrying in background...</div>
@@ -87,32 +87,32 @@
           <!-- Queue Selection Card -->
           <div class="hextech-card queue-card">
             <div class="card-header">
-              <span class="header-tag">GAME MODE</span>
+              <span class="header-tag">Game mode</span>
               <span id="current-queue-badge" class="queue-badge">Ranked Solo/Duo</span>
             </div>
             <div class="queue-selector-grid">
               <button class="queue-btn active" data-queue-id="420">
-                <span class="q-icon">⚔️</span>
+                <svg class="q-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 6.2L21 9.3l-4.8 4.3 1.3 6.4L12 16.8 6.5 20l1.3-6.4L3 9.3l6.6-1.1z"/></svg>
                 <span class="q-name">Ranked Solo</span>
               </button>
               <button class="queue-btn" data-queue-id="440">
-                <span class="q-icon">🛡️</span>
+                <svg class="q-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3.2v6.1c0 4.6-3.2 8.6-8 10.7-4.8-2.1-8-6.1-8-10.7V5.2z"/></svg>
                 <span class="q-name">Ranked Flex</span>
               </button>
               <button class="queue-btn" data-queue-id="400">
-                <span class="q-icon">🎯</span>
+                <svg class="q-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7.5 4.3v8.6L12 20.2 4.5 15.9V7.3z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="11.6" r="3"/></svg>
                 <span class="q-name">Normal Draft</span>
               </button>
               <button class="queue-btn" data-queue-id="450">
-                <span class="q-icon">❄️</span>
+                <svg class="q-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v20M3.4 7l17.2 10M20.6 7L3.4 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <span class="q-name">ARAM</span>
               </button>
               <button class="queue-btn" data-queue-id="2400">
-                <span class="q-icon">🌀</span>
+                <svg class="q-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 108.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 7.5a4.5 4.5 0 11-4.2 2.9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <span class="q-name">ARAM Mayhem</span>
               </button>
               <button class="queue-btn" data-queue-id="490">
-                <span class="q-icon">⚡</span>
+                <svg class="q-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2L4 13.5h6L9.5 22 20 10.5h-6.5z"/></svg>
                 <span class="q-name">Quickplay</span>
               </button>
             </div>
@@ -121,7 +121,7 @@
           <!-- Position Selectors (Primary & Secondary Roles) -->
           <div id="position-card" class="hextech-card position-card">
             <div class="card-header">
-              <span class="header-tag">POSITION PREFERENCES</span>
+              <span class="header-tag">Roles</span>
             </div>
             <div class="role-selectors-row">
               <div class="role-selector-block">
@@ -159,7 +159,7 @@
           <!-- Lobby Members -->
           <div class="hextech-card members-card">
             <div class="card-header">
-              <span class="header-tag">PARTY MEMBERS</span>
+              <span class="header-tag">Party</span>
               <span id="members-count" class="count-tag">1 / 5</span>
             </div>
             <div id="lobby-members-list" class="members-list">
@@ -171,10 +171,10 @@
           <div class="lobby-bottom-bar">
             <button id="btn-start-queue" class="btn btn-gold btn-large pulse-glow">
               <span class="btn-glow"></span>
-              <span class="btn-text">START QUEUE</span>
+              <span class="btn-text">Start queue</span>
             </button>
             <button id="btn-create-lobby" class="btn btn-cyan btn-large hidden">
-              <span class="btn-text">CREATE LOBBY</span>
+              <span class="btn-text">Create lobby</span>
             </button>
           </div>
         </div>
@@ -195,7 +195,7 @@
           </div>
 
           <div class="queue-info-card">
-            <span class="queue-status-pulse">FINDING MATCH</span>
+            <span class="queue-status-pulse">Finding match</span>
             <h3 id="queue-current-name" class="queue-name-banner">Ranked Solo/Duo</h3>
             <div class="queue-positions-summary">
               <span id="queue-pos-primary" class="badge-role">MID</span>
@@ -206,7 +206,7 @@
 
           <div class="queue-bottom-bar">
             <button id="btn-cancel-queue" class="btn btn-danger btn-large">
-              <span class="btn-text">CANCEL QUEUE</span>
+              <span class="btn-text">Cancel queue</span>
             </button>
           </div>
         </div>
@@ -218,17 +218,16 @@
           <div class="modal-glow-border"></div>
           
           <div class="ready-header">
-            <div class="hex-badge">⚔️</div>
-            <h2 class="ready-title">MATCH FOUND!</h2>
-            <p class="ready-subtitle">A game is ready for you</p>
+            <h2 class="ready-title">Match found</h2>
           </div>
 
+          <!-- The countdown is the whole point of this screen, so it is the largest thing on it. -->
           <div class="ready-timer-container">
+            <div class="ready-countdown">
+              <span id="ready-seconds-left">10</span><span class="ready-countdown-unit">s</span>
+            </div>
             <div class="ready-progress-bar">
               <div id="ready-progress-fill" class="progress-fill"></div>
-            </div>
-            <div class="ready-timer-text">
-              <span id="ready-seconds-left">10</span>s
             </div>
           </div>
 
@@ -236,21 +235,21 @@
             <div id="ready-player-dots" class="player-dots-grid">
               <!-- 10 dots generated in js -->
             </div>
-            <span id="ready-accepted-count" class="accepted-count-text">0 / 10 ACCEPTED</span>
+            <span id="ready-accepted-count" class="accepted-count-text">0 of 10 accepted</span>
           </div>
 
           <div class="ready-actions-container">
             <button id="btn-ready-accept" class="btn btn-accept btn-large pulse-emerald">
               <span class="btn-glow"></span>
-              <span class="btn-text">ACCEPT</span>
+              <span class="btn-text">Accept match</span>
             </button>
             <button id="btn-ready-decline" class="btn btn-decline">
-              <span class="btn-text">DECLINE</span>
+              <span class="btn-text">Decline</span>
             </button>
           </div>
 
           <div id="ready-response-badge" class="response-status-badge hidden">
-            <span>YOU ACCEPTED</span>
+            <span>Accepted</span>
           </div>
         </div>
       </section>
@@ -261,7 +260,7 @@
           <!-- Top Phase & Timer Header -->
           <div class="cs-top-bar">
             <div class="cs-phase-info">
-              <span id="cs-phase-title" class="cs-phase-title">BANNING PHASE</span>
+              <span id="cs-phase-title" class="cs-phase-title">Ban phase</span>
               <div class="cs-timer-wrapper">
                 <span id="cs-timer-value" class="cs-timer-value">30</span>
                 <div class="cs-timer-bar">
@@ -272,8 +271,7 @@
 
             <!-- Turn Banner Flasher -->
             <div id="cs-turn-banner" class="cs-turn-banner hidden">
-              <span class="turn-flasher-icon">⚠️</span>
-              <span id="cs-turn-text" class="turn-flasher-text">YOUR TURN TO BAN</span>
+                            <span id="cs-turn-text" class="turn-flasher-text">Your turn to ban</span>
             </div>
           </div>
 
@@ -281,24 +279,22 @@
           <div class="cs-teams-summary">
             <!-- Ally Team Strip -->
             <div class="cs-team ally-team">
-              <div class="team-header">ALLIES</div>
+              <div class="team-header">Allies</div>
               <div id="cs-ally-roster" class="roster-slots">
                 <!-- 5 Ally slots -->
               </div>
               <div id="cs-ally-bans-row" class="team-bans">
-                <span class="bans-label">Bans:</span>
                 <div id="cs-ally-bans" class="bans-slots"></div>
               </div>
             </div>
 
             <!-- Enemy Team Strip -->
             <div class="cs-team enemy-team">
-              <div class="team-header">ENEMIES</div>
+              <div class="team-header">Enemies</div>
               <div id="cs-enemy-roster" class="roster-slots">
                 <!-- 5 Enemy slots -->
               </div>
               <div id="cs-enemy-bans-row" class="team-bans">
-                <span class="bans-label">Bans:</span>
                 <div id="cs-enemy-bans" class="bans-slots"></div>
               </div>
             </div>
@@ -308,22 +304,22 @@
           <div id="cs-bench-panel" class="cs-bench-panel hidden">
             <!-- Initial Card Selection banner (first seconds when choosing starter) -->
             <div id="cs-bench-choose-banner" class="bench-choose-banner hidden">
-              <span class="choose-banner-title">CHOOSE YOUR CHAMPION</span>
+              <span class="choose-banner-title">Choose your champion</span>
               <span class="choose-banner-sub">Tap one of your cards below to lock it in</span>
             </div>
 
             <div id="cs-bench-current-section" class="bench-section hidden">
-              <span class="bench-section-label">YOUR CHAMPION</span>
+              <span class="bench-section-label">Your champion</span>
               <div id="cs-bench-current" class="bench-current-row"></div>
             </div>
 
             <div id="cs-bench-cards-section" class="bench-section hidden">
-              <span id="cs-bench-cards-label" class="bench-section-label">YOUR CARDS <span class="bench-hint">tap to take</span></span>
+              <span id="cs-bench-cards-label" class="bench-section-label">Your cards <span class="bench-hint">tap to take</span></span>
               <div id="cs-bench-cards" class="bench-cards-row"></div>
             </div>
 
             <div id="cs-bench-pool-section" class="bench-section hidden">
-              <span class="bench-section-label">TEAM BENCH <span class="bench-hint">tap to swap</span></span>
+              <span class="bench-section-label">Team bench <span class="bench-hint">tap to swap</span></span>
               <div id="cs-bench-pool" class="bench-cards-row"></div>
             </div>
 
@@ -333,7 +329,7 @@
           <!-- Champion Filter & Search -->
           <div id="cs-filter-bar" class="cs-filter-bar">
             <div class="cs-search-wrapper">
-              <span class="search-icon">🔍</span>
+              <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3a7 7 0 105.3 11.6l4.5 4.5 1.4-1.4-4.5-4.5A7 7 0 0010 3zm0 2a5 5 0 110 10 5 5 0 010-10z"/></svg>
               <input type="text" id="champ-search-input" class="hextech-input" placeholder="Search champion..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
               <button id="champ-search-clear" class="btn-clear hidden">✕</button>
             </div>
@@ -382,7 +378,7 @@
             <!-- Main Lock-In / Ban Action Button -->
             <div class="cs-main-action-wrapper">
               <button id="btn-cs-action" class="btn btn-gold btn-lockin" disabled>
-                <span id="cs-action-btn-text" class="btn-text">LOCK IN</span>
+                <span id="cs-action-btn-text" class="btn-text">Lock in</span>
               </button>
             </div>
           </div>
@@ -399,8 +395,8 @@
               <circle cx="50" cy="50" r="16" fill="#c8aa6e"/>
             </svg>
           </div>
-          <h2 class="in-game-title">Match In Progress</h2>
-          <p class="in-game-desc">Your game is running! Switch back to your PC to play.</p>
+          <h2 class="in-game-title">Match in progress</h2>
+          <p class="in-game-desc">Head back to your PC.</p>
           <div class="in-game-champ-box">
             <img id="in-game-champ-icon" class="in-game-avatar" src="" alt="Champion" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23091428%22/><circle cx=%2250%22 cy=%2250%22 r=%2230%22 fill=%22%23c8aa6e%22/></svg>'">
             <span id="in-game-champ-name" class="in-game-champ-name">Champion</span>
@@ -409,11 +405,11 @@
           <!-- Live match roster, from the gameflow session -->
           <div id="in-game-rosters" class="in-game-rosters hidden">
             <div class="ig-team">
-              <span class="ig-team-label ally">YOUR TEAM</span>
+              <span class="ig-team-label ally">Your team</span>
               <div id="in-game-ally-team" class="ig-team-row"></div>
             </div>
             <div class="ig-team">
-              <span class="ig-team-label enemy">ENEMY TEAM</span>
+              <span class="ig-team-label enemy">Enemy team</span>
               <div id="in-game-enemy-team" class="ig-team-row"></div>
             </div>
           </div>
@@ -442,7 +438,7 @@
       <div class="qr-modal-card">
         <div class="qr-modal-header">
           <div class="qr-title-box">
-            <span class="qr-icon">📱</span>
+            <svg class="qr-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3zm2 2v3h3V5zM14 3h7v7h-7zm2 2v3h3V5zM3 14h7v7H3zm2 2v3h3v-3zM14 14h3v3h-3zm5 0h2v2h-2zm-5 5h2v2h-2zm3 0h4v2h-4z"/></svg>
             <div>
               <h3 class="qr-modal-title">Connect Smartphone</h3>
               <span class="qr-modal-subtitle">Control League of Legends from your phone</span>
@@ -476,7 +472,7 @@
           <div class="qr-url-card">
             <input type="text" id="qr-url-input" class="qr-url-field" readonly value="http://localhost:8000">
             <button id="btn-copy-qr-url" class="btn btn-gold btn-copy" title="Copy URL">
-              <span id="copy-btn-text">COPY</span>
+              <span id="copy-btn-text">Copy</span>
             </button>
           </div>
 
@@ -489,7 +485,7 @@
           </div>
 
           <div class="qr-firewall-note">
-            <span class="note-icon">💡</span>
+            <svg class="note-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2zM9.5 20h5a1 1 0 010 2h-5a1 1 0 010-2z"/></svg>
             <span>If phone cannot load page, allow Python/Port 8000 in Windows Firewall.</span>
           </div>
         </div>
@@ -500,6 +496,6 @@
     <div id="toast-container" class="toast-container"></div>
   </div>
 
-  <script src="js/app.js?v=20260906_1"></script>
+  <script src="js/app.js?v=20260906_2"></script>
 </body>
 </html>

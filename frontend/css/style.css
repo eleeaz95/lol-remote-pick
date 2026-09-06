@@ -47,12 +47,34 @@
   --font-serif: 'Cinzel', 'Trajan Pro', Georgia, serif;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
+  /* Type scale - minor third from a 16px base. Sizes are the hierarchy here;
+     the display face is reserved for a single moment (see .ready-title). */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1.0625rem;
+  --text-lg: 1.375rem;
+  --text-xl: 1.75rem;
+  --text-hero: 4rem;
+
+  /* Smallest comfortable touch target (Apple HIG / Material both land here) */
+  --tap-min: 44px;
+
   /* Spacing & Radii */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --header-height: 56px;
   --bottom-bar-height: 76px;
+}
+
+/* Form controls do not inherit the page font on their own, which left several buttons
+   (queue picker, header icons, spell slots) rendering in the browser default. */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
 /* Base & Reset */
@@ -140,10 +162,8 @@ body.hextech-theme {
   border-radius: 12px;
   background: rgba(1, 10, 19, 0.6);
   border: 1px solid rgba(200, 170, 110, 0.2);
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
 }
 
 .status-dot {
@@ -230,20 +250,20 @@ body.hextech-theme {
 }
 
 .user-name {
-  font-family: var(--font-serif);
+  font-size: var(--text-sm);
   font-weight: 700;
   color: var(--gold-light);
-  font-size: 13px;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
+  /* Was a hard 80px cap that truncated every Riot ID; now it takes the space that is free. */
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Icon Buttons */
 .icon-btn {
-  width: 36px;
-  height: 36px;
+  width: var(--tap-min);
+  height: var(--tap-min);
   border-radius: var(--radius-sm);
   background: rgba(12, 26, 46, 0.8);
   border: 1px solid var(--gold-border);
@@ -319,12 +339,9 @@ body.hextech-theme {
 }
 
 .header-tag {
-  font-family: var(--font-serif);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--gold-metallic);
-  text-transform: uppercase;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-main);
 }
 
 .btn {
@@ -332,10 +349,9 @@ body.hextech-theme {
   align-items: center;
   justify-content: center;
   position: relative;
-  font-family: var(--font-serif);
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  font-family: inherit;
+  font-weight: 600;
+  letter-spacing: 0;
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -392,18 +408,29 @@ body.hextech-theme {
 /* Danger Red Button */
 .btn-danger,
 .btn-decline {
-  background: linear-gradient(180deg, #38121a 0%, #20080d 100%);
-  color: #ffccd3;
-  border: 1.5px solid var(--danger-red);
-  box-shadow: 0 0 12px var(--danger-red-glow);
+  background: transparent;
+  color: var(--danger-red);
+  border: 1px solid rgba(232, 64, 87, 0.35);
+  box-shadow: none;
+  min-height: var(--tap-min);
+  font-size: var(--text-base);
+  letter-spacing: 0;
+}
+
+.btn-decline:active {
+  background: rgba(232, 64, 87, 0.12);
 }
 
 /* Accept Button */
 .btn-accept {
-  background: linear-gradient(180deg, #10422a 0%, #092618 100%);
-  color: #d1fae5;
-  border: 2px solid var(--emerald-green);
-  box-shadow: 0 0 20px var(--emerald-green-glow);
+  background: linear-gradient(180deg, #1ec876 0%, #12a05c 100%);
+  color: #04150c;
+  border: none;
+  box-shadow: 0 0 24px var(--emerald-green-glow);
+  min-height: 64px;
+  font-size: var(--text-md);
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 /* ==========================================================================
@@ -479,7 +506,6 @@ body.hextech-theme {
 }
 
 .standby-title {
-  font-family: var(--font-serif);
   font-size: 18px;
   color: var(--gold-light);
   margin-bottom: 10px;
@@ -547,7 +573,16 @@ body.hextech-theme {
 }
 
 .queue-btn .q-icon {
-  font-size: 18px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  fill: currentColor;
+  color: var(--text-muted);
+  transition: color 0.15s ease;
+}
+
+.queue-btn.active .q-icon {
+  color: var(--hex-magic);
 }
 
 .queue-btn .q-name {
@@ -614,7 +649,6 @@ body.hextech-theme {
   position: absolute;
   right: 10px;
   pointer-events: none;
-  font-family: var(--font-serif);
   font-size: 10px;
   font-weight: 800;
   color: var(--gold-metallic);
@@ -661,8 +695,10 @@ body.hextech-theme {
 }
 
 .member-leader-crown {
-  color: var(--gold-bright);
-  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  fill: var(--gold-bright);
+  flex-shrink: 0;
 }
 
 .member-roles {
@@ -759,7 +795,7 @@ body.hextech-theme {
 }
 
 .timer-time {
-  font-family: var(--font-serif);
+  font-variant-numeric: tabular-nums;
   font-size: 38px;
   font-weight: 800;
   color: var(--gold-light);
@@ -786,17 +822,14 @@ body.hextech-theme {
 
 .queue-status-pulse {
   display: inline-block;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  color: var(--hex-magic);
-  text-transform: uppercase;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
   margin-bottom: 6px;
   animation: pulse-opacity 1.5s infinite alternate;
 }
 
 .queue-name-banner {
-  font-family: var(--font-serif);
   font-size: 18px;
   color: var(--gold-light);
   margin-bottom: 8px;
@@ -884,21 +917,14 @@ body.hextech-theme {
   margin-bottom: 8px;
 }
 
+/* The only place the display face is used: this screen is the app's one loud moment. */
 .ready-title {
   font-family: var(--font-serif);
-  font-size: 24px;
-  font-weight: 900;
+  font-size: var(--text-lg);
+  font-weight: 700;
   color: var(--gold-light);
-  letter-spacing: 2px;
-  text-shadow: 0 0 16px rgba(200, 170, 110, 0.6);
-  margin-bottom: 4px;
-}
-
-.ready-subtitle {
-  font-size: 13px;
-  color: var(--hex-magic);
-  font-weight: 500;
-  margin-bottom: 20px;
+  letter-spacing: 0.02em;
+  margin-bottom: 2px;
 }
 
 .ready-timer-container {
@@ -922,11 +948,26 @@ body.hextech-theme {
   transition: width 0.1s linear;
 }
 
-.ready-timer-text {
-  font-family: var(--font-serif);
-  font-size: 16px;
+.ready-countdown {
+  font-size: var(--text-hero);
   font-weight: 700;
+  line-height: 1;
   color: var(--gold-light);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  margin-bottom: 14px;
+}
+
+.ready-countdown-unit {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+/* Under ten seconds the number itself carries the alarm - no extra chrome needed. */
+.ready-countdown.is-urgent {
+  color: var(--danger-red);
 }
 
 .ready-players-status {
@@ -962,10 +1003,9 @@ body.hextech-theme {
 }
 
 .accepted-count-text {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--gold-metallic);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
 .ready-actions-container {
@@ -1024,8 +1064,7 @@ body.hextech-theme {
 }
 
 .cs-phase-title {
-  font-family: var(--font-serif);
-  font-size: 14px;
+  font-size: var(--text-lg);
   font-weight: 800;
   letter-spacing: 1px;
   color: var(--gold-light);
@@ -1042,7 +1081,7 @@ body.hextech-theme {
 }
 
 .cs-timer-value {
-  font-family: var(--font-serif);
+  font-variant-numeric: tabular-nums;
   font-size: 20px;
   font-weight: 800;
   color: var(--gold-bright);
@@ -1086,7 +1125,6 @@ body.hextech-theme {
 }
 
 .turn-flasher-text {
-  font-family: var(--font-serif);
   font-size: 13px;
   font-weight: 900;
   color: #ffffff;
@@ -1117,19 +1155,18 @@ body.hextech-theme {
 }
 
 .team-header {
-  font-family: var(--font-serif);
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--gold-metallic);
-  letter-spacing: 1px;
-  width: 50px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  width: auto;
   flex-shrink: 0;
 }
 
 .roster-slots {
   display: flex;
   gap: 6px;
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .player-slot-card {
@@ -1219,8 +1256,11 @@ body.hextech-theme {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex-shrink: 0;
-  padding-left: 4px;
+  /* Was flex-shrink: 0, which pushed this row 11px past the viewport at 360px wide. */
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding-left: 6px;
   border-left: 1px solid rgba(200, 170, 110, 0.15);
 }
 
@@ -1280,14 +1320,17 @@ body.hextech-theme {
 .search-icon {
   position: absolute;
   left: 10px;
-  color: var(--text-dim);
-  font-size: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  fill: var(--text-dim);
   pointer-events: none;
 }
 
 .hextech-input {
   width: 100%;
-  height: 38px;
+  height: var(--tap-min);
   background: rgba(6, 14, 26, 0.85);
   border: 1px solid var(--gold-border);
   border-radius: var(--radius-sm);
@@ -1304,6 +1347,7 @@ body.hextech-theme {
 }
 
 .btn-clear {
+  font-family: inherit;
   position: absolute;
   right: 10px;
   background: none;
@@ -1325,14 +1369,15 @@ body.hextech-theme {
 }
 
 .role-tab {
+  font-family: inherit;
   flex: 1;
   min-width: 48px;
-  height: 30px;
+  height: var(--tap-min);
   background: rgba(12, 26, 46, 0.7);
   border: 1px solid rgba(200, 170, 110, 0.2);
   border-radius: var(--radius-sm);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-sm);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1449,7 +1494,6 @@ body.hextech-theme {
 }
 
 .choose-banner-title {
-  font-family: 'Cinzel', serif;
   font-size: 14px;
   font-weight: 800;
   letter-spacing: 1.5px;
@@ -1469,12 +1513,9 @@ body.hextech-theme {
 }
 
 .bench-section-label {
-  font-family: 'Cinzel', serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1.4px;
-  color: var(--gold-bright);
-  text-transform: uppercase;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-main);
 }
 
 .bench-hint {
@@ -1619,7 +1660,6 @@ body.hextech-theme {
 }
 
 .preview-name {
-  font-family: var(--font-serif);
   font-size: 13px;
   font-weight: 700;
   color: var(--gold-light);
@@ -1644,8 +1684,8 @@ body.hextech-theme {
 
 .spell-slot-btn {
   position: relative;
-  width: 38px;
-  height: 38px;
+  width: var(--tap-min);
+  height: var(--tap-min);
   border-radius: var(--radius-sm);
   background: rgba(12, 26, 46, 0.9);
   border: 1px solid var(--gold-border);
@@ -1759,7 +1799,6 @@ body.hextech-theme {
 }
 
 .in-game-title {
-  font-family: var(--font-serif);
   font-size: 20px;
   color: var(--gold-light);
   margin-bottom: 8px;
@@ -1789,7 +1828,6 @@ body.hextech-theme {
 }
 
 .in-game-champ-name {
-  font-family: var(--font-serif);
   font-weight: 700;
   color: var(--gold-light);
   font-size: 13px;
@@ -1850,12 +1888,12 @@ body.hextech-theme {
 }
 
 .sheet-title {
-  font-family: var(--font-serif);
   font-size: 16px;
   color: var(--gold-light);
 }
 
 .btn-close {
+  font-family: inherit;
   background: none;
   border: none;
   color: var(--text-muted);
@@ -2171,7 +2209,6 @@ body.hextech-theme {
 }
 
 .qr-modal-title {
-  font-family: var(--font-serif);
   font-size: 17px;
   font-weight: 700;
   color: var(--gold-light);
@@ -2315,11 +2352,9 @@ body.hextech-theme {
 }
 
 .ig-team-label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: var(--hex-gold, #c8aa6e);
-  opacity: 0.85;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 .ig-team-label.enemy {
@@ -2329,9 +2364,15 @@ body.hextech-theme {
 .ig-team-row {
   display: flex;
   gap: 6px;
+  /* Scroll is only a safety net for oversized rosters; the five slots shrink to fit first,
+     and the native bar is hidden because it renders as desktop chrome inside the card. */
   overflow-x: auto;
-  padding-bottom: 4px;
+  scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+}
+
+.ig-team-row::-webkit-scrollbar {
+  display: none;
 }
 
 .ig-slot {
@@ -2339,7 +2380,7 @@ body.hextech-theme {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  min-width: 56px;
+  min-width: 0;
   flex: 1 1 0;
 }
 
@@ -2392,4 +2433,95 @@ body.hextech-theme {
   font-size: 0.52rem;
   letter-spacing: 0.06em;
   color: rgba(240, 230, 210, 0.55);
+}
+
+/* ==========================================================================
+   Accessibility & Viewport Adaptation
+   ========================================================================== */
+
+/* Honour a reduced-motion preference: the app pulses, flashes and shimmers in
+   14 keyframe animations, all of which are decorative rather than informative. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Small Android phones report 360 CSS px (1080 physical at DPR 3), which is the
+   real floor for this app - tighten the densest surfaces rather than let them clip. */
+@media (max-width: 380px) {
+  .champions-grid {
+    gap: 6px;
+  }
+
+  .queue-btn {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .q-name {
+    font-size: var(--text-xs);
+  }
+}
+
+/* Landscape on a phone: the vertical budget collapses, so trade the decorative
+   breathing room for content instead of scrolling the primary action off screen. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .ready-countdown {
+    font-size: var(--text-xl);
+    margin-bottom: 8px;
+  }
+
+  .ready-title {
+    font-size: var(--text-md);
+  }
+
+  .btn-accept {
+    min-height: var(--tap-min);
+  }
+}
+
+/* Keyboard focus must stay visible: several interactive elements only signalled
+   state through :active, which a keyboard never triggers. */
+:focus-visible {
+  outline: 2px solid var(--hex-magic);
+  outline-offset: 2px;
+}
+
+/* The status pill spells out the connection state, which costs the summoner name its
+   room on a 360px header. Under 400px the coloured dot alone carries the state. */
+@media (max-width: 400px) {
+  .connection-badge .status-text {
+    display: none;
+  }
+
+  .connection-badge {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
+.btn-icon {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  display: block;
+}
+
+.qr-icon {
+  width: 28px;
+  height: 28px;
+  fill: var(--hex-magic);
+}
+
+.note-icon {
+  width: 14px;
+  height: 14px;
+  fill: var(--gold-metallic);
+  flex-shrink: 0;
 }

@@ -513,6 +513,18 @@
   // Toast Notifications
   // =========================================================================
 
+  const SOUND_ON_PATH =
+    'M4 9v6h4l5 4V5L8 9zm12.5 3a4.5 4.5 0 00-2.5-4v8a4.5 4.5 0 002.5-4zm-2.5-8v2a6 6 0 010 12v2a8 8 0 000-16z';
+  const SOUND_OFF_PATH =
+    'M4 9v6h4l5 4V5L8 9zm13.6 3l2.1-2.1-1.4-1.4-2.1 2.1-2.1-2.1-1.4 1.4 2.1 2.1-2.1 2.1 1.4 1.4 2.1-2.1 2.1 2.1 1.4-1.4z';
+
+  function setSoundIcon(el) {
+    if (!el) return;
+    const path = el.querySelector('path');
+    if (path) path.setAttribute('d', localState.soundEnabled ? SOUND_ON_PATH : SOUND_OFF_PATH);
+    el.setAttribute('aria-label', localState.soundEnabled ? 'Mute sound' : 'Unmute sound');
+  }
+
   function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
     if (!container) return;
@@ -1056,7 +1068,9 @@
 
     if (state.summoner && state.summoner.displayName) {
       profileContainer.classList.remove('hidden');
-      userName.textContent = state.summoner.displayName;
+      // The tagline never fits a 360px header next to the badges, and it tells the player
+      // nothing they don't know - the full Riot ID still shows in the party list.
+      userName.textContent = state.summoner.displayName.split('#')[0];
       userLevel.textContent = state.summoner.summonerLevel;
       userAvatar.src = getSummonerIconUrl(state.summoner.profileIconId);
     } else {
@@ -1169,7 +1183,7 @@
           <div class="member-left">
             <img class="member-avatar" src="${getSummonerIconUrl(m.profileIconId)}" alt="Avatar">
             <span class="member-name">${escapeHtml(m.summonerName || 'Summoner')}</span>
-            ${m.isLeader ? '<span class="member-leader-crown" title="Party Leader">👑</span>' : ''}
+            ${m.isLeader ? '<svg class="member-leader-crown" viewBox="0 0 24 24" aria-label="Party leader" role="img"><path d="M3 8l4.5 3.5L12 5l4.5 6.5L21 8l-1.8 10H4.8z"/></svg>' : ''}
           </div>
           <div class="member-roles">
             <span>${escapeHtml(m.firstPositionPreference || 'FILL')} / ${escapeHtml(m.secondPositionPreference || 'FILL')}</span>
@@ -1189,7 +1203,7 @@
       btnStart.classList.remove('hidden');
       btnCreate.classList.add('hidden');
       btnStart.disabled = !state.lobby.canStartQueue;
-      btnStart.querySelector('.btn-text').textContent = state.lobby.isLeader ? 'START QUEUE' : 'WAITING FOR LEADER';
+      btnStart.querySelector('.btn-text').textContent = state.lobby.isLeader ? 'Start queue' : 'Waiting for the leader';
     }
   }
 
@@ -1238,7 +1252,7 @@
     // Accepted count text
     const acceptedCountText = document.getElementById('ready-accepted-count');
     if (acceptedCountText) {
-      acceptedCountText.textContent = `${state.readyCheck.numAccepted} / ${state.readyCheck.totalPlayers} ACCEPTED`;
+      acceptedCountText.textContent = `${state.readyCheck.numAccepted} of ${state.readyCheck.totalPlayers} accepted`;
     }
 
     // Player status dots
@@ -1266,7 +1280,7 @@
       btnAccept.classList.add('hidden');
       btnDecline.classList.add('hidden');
       responseBadge.classList.remove('hidden');
-      responseBadge.innerHTML = '<span>YOU ACCEPTED! WAITING...</span>';
+      responseBadge.innerHTML = '<span>Accepted — waiting for the others</span>';
     } else if (state.readyCheck.playerResponse === 'Declined') {
       btnAccept.classList.add('hidden');
       btnDecline.classList.add('hidden');
@@ -1301,6 +1315,8 @@
       if (localState.lastReadyCheckDisplayedSec !== seconds) {
         localState.lastReadyCheckDisplayedSec = seconds;
         timerText.textContent = seconds;
+        // The number itself turns red near the end instead of adding more chrome
+        timerText.parentElement?.classList.toggle('is-urgent', seconds <= 5);
       }
     }
 
@@ -1344,10 +1360,13 @@
     const phaseTitle = document.getElementById('cs-phase-title');
     if (phaseTitle) {
       if (benchMode) {
-        phaseTitle.textContent = 'CHAMPION SWAP';
+        phaseTitle.textContent = 'Champion swap';
         phaseTitle.classList.remove('ban-phase');
       } else {
-        phaseTitle.textContent = `${cs.actionPhase} PHASE`;
+        phaseTitle.textContent =
+          cs.actionPhase === 'NONE'
+            ? 'Champion select'
+            : `${cs.actionPhase.charAt(0)}${cs.actionPhase.slice(1).toLowerCase()} phase`;
         phaseTitle.classList.toggle('ban-phase', cs.actionPhase === 'BAN');
       }
     }
@@ -1358,7 +1377,7 @@
     if (turnBanner && turnText) {
       if (cs.isMyTurn && !benchMode) {
         turnBanner.classList.remove('hidden');
-        turnText.textContent = cs.actionPhase === 'BAN' ? 'YOUR TURN TO BAN!' : 'YOUR TURN TO PICK!';
+        turnText.textContent = cs.actionPhase === 'BAN' ? 'Your turn to ban' : 'Your turn to pick';
       } else {
         turnBanner.classList.add('hidden');
       }
@@ -1439,8 +1458,8 @@
     const cardsLabel = document.getElementById('cs-bench-cards-label');
     if (cardsLabel) {
       cardsLabel.innerHTML = hasStarter
-        ? 'YOUR CARDS <span class="bench-hint">tap to swap</span>'
-        : 'YOUR CARDS <span class="bench-hint">tap to choose your starter</span>';
+        ? 'Your cards <span class="bench-hint">tap to swap</span>'
+        : 'Your cards <span class="bench-hint">pick your starter</span>';
     }
 
     // If player has priority cards, show them in YOUR CARDS
@@ -1688,7 +1707,7 @@
       previewName.textContent = champ.name;
     } else {
       previewIcon.src = '';
-      previewName.textContent = benchMode ? 'Waiting for champion' : 'Select Champion';
+      previewName.textContent = benchMode ? 'Waiting' : 'No champion';
       previewSub.textContent = benchMode ? 'Your champion is assigned randomly' : 'Tap a champion above';
     }
 
@@ -1696,7 +1715,7 @@
 
     if (benchMode) {
       // Champions are assigned; the only action is swapping from the bench
-      if (champ) previewSub.textContent = 'Assigned — swap from the bench';
+      if (champ) previewSub.textContent = 'Swap from the bench';
       btnAction.classList.add('hidden');
       btnAction.disabled = true;
       return;
@@ -1708,19 +1727,19 @@
       // Active Ban turn
       previewSub.textContent = 'Ready to ban';
       btnAction.className = 'btn btn-lockin ban-action';
-      btnActionText.textContent = champ ? `BAN ${champ.name.toUpperCase()}` : 'BAN';
+      btnActionText.textContent = champ ? `Ban ${champ.name}` : 'Ban';
       btnAction.disabled = !champ;
     } else if (cs.actionPhase === 'PICK' && cs.isMyTurn) {
       // Active Pick turn
       previewSub.textContent = 'Ready to lock in';
       btnAction.className = 'btn btn-gold btn-lockin';
-      btnActionText.textContent = champ ? `LOCK IN ${champ.name.toUpperCase()}` : 'LOCK IN';
+      btnActionText.textContent = champ ? `Lock in ${champ.name}` : 'Lock in';
       btnAction.disabled = !champ;
     } else {
       // Pre-selection / Pick intent mode (before turn, after ban, or planning)
-      previewSub.textContent = champ ? 'Pre-selected (Pick Intent)' : 'Pre-select your champion';
+      previewSub.textContent = champ ? 'Pre-selected' : 'Tap a champion below';
       btnAction.className = 'btn btn-lockin preselect-action';
-      btnActionText.textContent = champ ? `PRE-SELECT ${champ.name.toUpperCase()}` : 'PRE-SELECT';
+      btnActionText.textContent = champ ? `Pre-select ${champ.name}` : 'Pre-select';
       btnAction.disabled = !champ;
     }
   }
@@ -1947,7 +1966,7 @@
         localState.soundEnabled = !localState.soundEnabled;
         localStorage.setItem('lol_sound_enabled', localState.soundEnabled);
         btnSound.classList.toggle('active', localState.soundEnabled);
-        document.getElementById('sound-icon').textContent = localState.soundEnabled ? '🔊' : '🔇';
+        setSoundIcon(document.getElementById('sound-icon'));
         if (localState.soundEnabled) {
           initAudioContext();
           playClickSound();
@@ -1956,7 +1975,7 @@
       // Initial UI
       btnSound.classList.toggle('active', localState.soundEnabled);
       const sIcon = document.getElementById('sound-icon');
-      if (sIcon) sIcon.textContent = localState.soundEnabled ? '🔊' : '🔇';
+      if (sIcon) setSoundIcon(sIcon);
     }
 
     // Wake Lock toggle
@@ -2002,7 +2021,7 @@
             .writeText(urlInput.value)
             .then(() => {
               const copyBtnText = document.getElementById('copy-btn-text');
-              if (copyBtnText) copyBtnText.textContent = 'COPIED! ✓';
+              if (copyBtnText) copyBtnText.textContent = 'Copied';
               showToast('LAN URL copied to clipboard!', 'success');
               playClickSound();
               setTimeout(() => {
@@ -2187,7 +2206,7 @@
           // Visual feedback
           const actionBtnText = document.getElementById('cs-action-btn-text');
           if (actionBtnText) {
-            actionBtnText.textContent = 'PRE-SELECTED ✓';
+            actionBtnText.textContent = 'Pre-selected';
             setTimeout(() => {
               renderChampSelectActionBar();
             }, 1200);
