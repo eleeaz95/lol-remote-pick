@@ -318,6 +318,31 @@ class StateEngine:
         if state_changed:
             await self._emit_state_change()
 
+    def set_subset_champion_ids(self, champion_ids: List[Any]) -> None:
+        """Attach the pickable card list, which only the REST endpoint exposes.
+
+        Card-selection modes deal a few champions before the shared bench exists, and the
+        champ select session pushed over the WebSocket does not carry them.
+        """
+        if not self._raw_champ_select:
+            return
+
+        clean = []
+        for value in champion_ids or []:
+            try:
+                champion_id = int(value)
+            except (TypeError, ValueError):
+                continue
+            if champion_id > 0 and champion_id not in clean:
+                clean.append(champion_id)
+
+        if self._raw_champ_select.get("subsetChampionIds") == clean:
+            return
+
+        self._raw_champ_select["subsetChampionIds"] = clean
+        self._cached_state = None
+        asyncio.create_task(self._emit_state_change())
+
     def update_from_poll(
         self,
         summoner: Optional[Dict[str, Any]] = None,

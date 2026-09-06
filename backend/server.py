@@ -14,6 +14,7 @@ import asyncio
 import json
 import logging
 import socket
+import time
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, Set
 
@@ -312,6 +313,8 @@ class AppHub:
 
         self.active_websockets: Set[WebSocket] = set()
         self.background_tasks: List[asyncio.Task] = []
+        self._subset_ids_loaded = False
+        self._subset_last_try = 0.0
         self._is_running = False
         self._last_broadcast_payload: Optional[Dict[str, Any]] = None
 
@@ -341,6 +344,36 @@ class AppHub:
 
         for ws in dead_sockets:
             self.active_websockets.discard(ws)
+
+    async def _fetch_subset_champions(self, uri: str, data: Any, event_type: str = "Update") -> None:
+        """Pull the card list for card-selection champ selects (ARAM Mayhem and friends).
+
+        The champion cards dealt at the start of the session live behind a REST endpoint and
+        never arrive over the WebSocket, so without this they only showed up once the shared
+        bench replaced them - the phone lagged the client by a whole phase.
+        """
+        if uri.rstrip("/") != "/lol-champ-select/v1/session":
+            return
+
+        if event_type == "Delete" or not isinstance(data, dict):
+            self._subset_ids_loaded = False
+            self._subset_last_try = 0.0
+            return
+
+        if not data.get("allowSubsetChampionPicks") or self._subset_ids_loaded:
+            return
+
+        # Cards are not always dealt on the first session event, so retry - but no faster than
+        # once a second, because the session ticks with every timer update.
+        now = time.monotonic()
+        if now - self._subset_last_try < 1.0:
+            return
+        self._subset_last_try = now
+
+        subset = await self.lcu_client.get_subset_champion_list()
+        if subset:
+            self._subset_ids_loaded = True
+            self.state_engine.set_subset_champion_ids(subset)
 
     async def _on_state_engine_change(self, state: Dict[str, Any]) -> None:
         """Callback registered with StateEngine."""
@@ -482,6 +515,7 @@ class AppHub:
 
             # Wire LCU WebSocket to StateEngine
             self.lcu_ws.subscribe(self.state_engine.handle_lcu_event)
+            self.lcu_ws.subscribe(self._fetch_subset_champions)
             self.lcu_ws.subscribe_connection(self._on_lcu_ws_connection)
             await self.lcu_ws.start()
 
@@ -496,6 +530,7 @@ class AppHub:
             self.lcu_connector = LCUConnector(custom_path=self.settings.custom_league_path)
 
             self.lcu_ws.subscribe(self.state_engine.handle_lcu_event)
+            self.lcu_ws.subscribe(self._fetch_subset_champions)
             self.lcu_ws.subscribe_connection(self._on_lcu_ws_connection)
             await self.lcu_ws.start()
 

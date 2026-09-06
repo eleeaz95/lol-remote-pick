@@ -367,3 +367,39 @@ async def test_aram_mayhem_lobby_and_champ_select(mock_app_and_client):
     assert len(cs["bench"]) > 0
     assert cs["isMyTurn"] is False
     assert cs["bans"]["myTeamBans"] == []
+
+
+@pytest.mark.asyncio
+async def test_card_selection_champions_arrive_over_the_websocket(mock_app_and_client):
+    """The dealt cards must reach the phone as soon as champ select opens.
+
+    They live behind a REST route the champ select session never carries, and the poll loop
+    that used to fetch them is skipped entirely while the LCU WebSocket is healthy.
+    """
+    app, client, hub = mock_app_and_client
+
+    await hub.mock_server.trigger_lobby(queue_id=2400)
+    await hub.mock_server.trigger_champ_select(queue_id=2400)
+
+    # Give the event dispatch and the follow-up fetch a moment, without polling ever running
+    for _ in range(40):
+        await asyncio.sleep(0.05)
+        bench = (await client.get("/api/state")).json()["champSelect"]["bench"]
+        if any(entry["isPriority"] for entry in bench):
+            break
+
+    assert hub.lcu_ws.is_connected, "the fetch must work while the socket is up, not via polling"
+
+    state = (await client.get("/api/state")).json()
+    assert state["phase"] == "CHAMP_SELECT"
+    assert state["champSelect"]["pickMode"] == "BENCH"
+
+    bench = state["champSelect"]["bench"]
+    dealt = [entry["championId"] for entry in bench if entry["isPriority"]]
+    for champion_id in hub.mock_server.subset_champion_ids:
+        assert champion_id in dealt, f"card {champion_id} never reached the client"
+
+    # Leaving champ select must not strand the cards in the next session
+    await hub.mock_server.trigger_lobby(queue_id=2400)
+    await asyncio.sleep(0.2)
+    assert (await client.get("/api/state")).json()["champSelect"]["bench"] == []

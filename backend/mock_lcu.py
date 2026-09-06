@@ -3,7 +3,7 @@
 import asyncio
 import json
 import logging
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
@@ -175,6 +175,7 @@ class MockLCUServer:
         self.ready_check: Optional[Dict[str, Any]] = None
         self.champ_select: Optional[Dict[str, Any]] = None
         self.game_teams: Optional[Dict[str, Any]] = None
+        self.subset_champion_ids: List[int] = [63, 99, 45]
 
         self._setup_routes()
 
@@ -421,6 +422,12 @@ class MockLCUServer:
 
             await self.broadcast_event("/lol-champ-select/v1/session", self.champ_select)
             return Response(status_code=204)
+
+        @app.get("/lol-lobby-team-builder/champ-select/v1/subset-champion-list")
+        async def get_subset_champion_list():
+            if not self.champ_select or not self.champ_select.get("allowSubsetChampionPicks"):
+                return []
+            return self.subset_champion_ids
 
         # Metadata
         @app.get("/lol-game-queues/v1/queues")
@@ -682,6 +689,8 @@ class MockLCUServer:
         return {
             "localPlayerCellId": 0,
             "benchEnabled": True,
+            # The dealt cards are served by /subset-champion-list, not by this payload
+            "allowSubsetChampionPicks": True,
             # Own unchosen cards land on the bench flagged as priority
             "benchChampions": [
                 {"championId": 22, "isPriority": True},
