@@ -487,16 +487,10 @@
   }
 
   function updateWakeLockUI(active) {
-    const btn = document.getElementById('btn-wakelock');
-    if (btn) {
-      if (active) {
-        btn.classList.add('active');
-        btn.title = 'Screen Wake Lock: Active';
-      } else {
-        btn.classList.remove('active');
-        btn.title = 'Screen Wake Lock: Inactive';
-      }
-    }
+    const row = document.getElementById('setting-wakelock');
+    const state = document.getElementById('setting-wakelock-state');
+    if (row) row.setAttribute('aria-pressed', String(active));
+    if (state) state.textContent = active ? 'On' : 'Off';
   }
 
   document.addEventListener('visibilitychange', () => {
@@ -513,16 +507,19 @@
   // Toast Notifications
   // =========================================================================
 
-  const SOUND_ON_PATH =
-    'M4 9v6h4l5 4V5L8 9zm12.5 3a4.5 4.5 0 00-2.5-4v8a4.5 4.5 0 002.5-4zm-2.5-8v2a6 6 0 010 12v2a8 8 0 000-16z';
-  const SOUND_OFF_PATH =
-    'M4 9v6h4l5 4V5L8 9zm13.6 3l2.1-2.1-1.4-1.4-2.1 2.1-2.1-2.1-1.4 1.4 2.1 2.1-2.1 2.1 1.4 1.4 2.1-2.1 2.1 2.1 1.4-1.4z';
+  function openSettingsModal() {
+    document.getElementById('modal-settings')?.classList.remove('hidden');
+  }
 
-  function setSoundIcon(el) {
-    if (!el) return;
-    const path = el.querySelector('path');
-    if (path) path.setAttribute('d', localState.soundEnabled ? SOUND_ON_PATH : SOUND_OFF_PATH);
-    el.setAttribute('aria-label', localState.soundEnabled ? 'Mute sound' : 'Unmute sound');
+  function closeSettingsModal() {
+    document.getElementById('modal-settings')?.classList.add('hidden');
+  }
+
+  function updateSoundSetting() {
+    const row = document.getElementById('setting-sound');
+    const state = document.getElementById('setting-sound-state');
+    if (row) row.setAttribute('aria-pressed', String(localState.soundEnabled));
+    if (state) state.textContent = localState.soundEnabled ? 'On' : 'Off';
   }
 
   function showToast(message, type = 'info') {
@@ -1960,26 +1957,22 @@
     window.addEventListener('touchstart', unlockAudio, { passive: true });
 
     // Sound toggle
-    const btnSound = document.getElementById('btn-sound');
+    const btnSound = document.getElementById('setting-sound');
     if (btnSound) {
       btnSound.addEventListener('click', () => {
         localState.soundEnabled = !localState.soundEnabled;
         localStorage.setItem('lol_sound_enabled', localState.soundEnabled);
-        btnSound.classList.toggle('active', localState.soundEnabled);
-        setSoundIcon(document.getElementById('sound-icon'));
+        updateSoundSetting();
         if (localState.soundEnabled) {
           initAudioContext();
           playClickSound();
         }
       });
-      // Initial UI
-      btnSound.classList.toggle('active', localState.soundEnabled);
-      const sIcon = document.getElementById('sound-icon');
-      if (sIcon) setSoundIcon(sIcon);
+      updateSoundSetting();
     }
 
     // Wake Lock toggle
-    const btnWakeLock = document.getElementById('btn-wakelock');
+    const btnWakeLock = document.getElementById('setting-wakelock');
     if (btnWakeLock) {
       btnWakeLock.addEventListener('click', () => {
         if (localState.wakeLock) {
@@ -1989,6 +1982,17 @@
         }
       });
     }
+
+    // Settings sheet
+    const btnSettings = document.getElementById('btn-settings');
+    if (btnSettings) {
+      btnSettings.addEventListener('click', () => {
+        playClickSound();
+        openSettingsModal();
+      });
+    }
+    document.getElementById('sheet-settings-backdrop')?.addEventListener('click', closeSettingsModal);
+    document.getElementById('sheet-settings-close')?.addEventListener('click', closeSettingsModal);
 
     // Standby Reconnect button
     const btnReconnect = document.getElementById('btn-reconnect');
@@ -2001,14 +2005,19 @@
     }
 
     // Connect Phone / QR Code Modal
-    const btnConnectPhone = document.getElementById('btn-connect-phone');
+    const btnConnectPhone = document.getElementById('setting-qr');
     const btnStandbyQr = document.getElementById('btn-standby-qr');
     const qrBackdrop = document.getElementById('qr-modal-backdrop');
     const qrClose = document.getElementById('qr-modal-close');
     const btnCopyQr = document.getElementById('btn-copy-qr-url');
     const qrSelect = document.getElementById('qr-adapter-select');
 
-    if (btnConnectPhone) btnConnectPhone.addEventListener('click', openQrModal);
+    if (btnConnectPhone) {
+      btnConnectPhone.addEventListener('click', () => {
+        closeSettingsModal();
+        openQrModal();
+      });
+    }
     if (btnStandbyQr) btnStandbyQr.addEventListener('click', openQrModal);
     if (qrBackdrop) qrBackdrop.addEventListener('click', closeQrModal);
     if (qrClose) qrClose.addEventListener('click', closeQrModal);

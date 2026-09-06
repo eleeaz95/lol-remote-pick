@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260906_2">
+  <link rel="stylesheet" href="css/style.css?v=20260906_3">
 </head>
 <body class="hextech-theme">
   <div id="app" class="app-container">
@@ -39,14 +39,8 @@
       </div>
 
       <div class="header-right">
-        <button id="btn-connect-phone" class="icon-btn" title="Connect Phone / QR Code" aria-label="Connect Phone / QR Code">
-          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3zm2 2v3h3V5zM14 3h7v7h-7zm2 2v3h3V5zM3 14h7v7H3zm2 2v3h3v-3zM14 14h3v3h-3zm5 0h2v2h-2zm-5 5h2v2h-2zm3 0h4v2h-4z"/></svg>
-        </button>
-        <button id="btn-wakelock" class="icon-btn" title="Screen Wake Lock" aria-label="Screen Wake Lock">
-          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2zM9.5 20h5a1 1 0 010 2h-5a1 1 0 010-2z"/></svg>
-        </button>
-        <button id="btn-sound" class="icon-btn active" title="Sound Effects" aria-label="Toggle Sound">
-          <svg id="sound-icon" class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zm12.5 3a4.5 4.5 0 00-2.5-4v8a4.5 4.5 0 002.5-4zm-2.5-8v2a6 6 0 010 12v2a8 8 0 000-16z"/></svg>
+        <button id="btn-settings" class="icon-btn" aria-label="Settings" aria-haspopup="dialog">
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.8 7.8 0 000-2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 00-1.7-1L14.9 3h-3.8l-.4 2.6a7.6 7.6 0 00-1.7 1l-2.4-1-2 3.4 2 1.6a7.8 7.8 0 000 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.8 1.7 1l.4 2.4h3.8l.4-2.6c.6-.2 1.2-.6 1.7-1l2.4 1 2-3.4zM13 15.5a3.5 3.5 0 110-7 3.5 3.5 0 010 7z"/></svg>
         </button>
       </div>
     </header>
@@ -417,6 +411,32 @@
       </section>
     </main>
 
+    <!-- Settings Bottom Sheet -->
+    <div id="modal-settings" class="bottom-sheet-modal hidden" role="dialog" aria-modal="true" aria-labelledby="sheet-settings-title">
+      <div class="sheet-backdrop" id="sheet-settings-backdrop"></div>
+      <div class="sheet-content">
+        <div class="sheet-drag-handle"></div>
+        <div class="sheet-header">
+          <h3 id="sheet-settings-title" class="sheet-title">Settings</h3>
+          <button id="sheet-settings-close" class="btn-close" aria-label="Close settings">✕</button>
+        </div>
+        <div class="settings-list">
+          <button id="setting-sound" class="settings-row" aria-pressed="true">
+            <span class="settings-label">Sound effects</span>
+            <span id="setting-sound-state" class="settings-state">On</span>
+          </button>
+          <button id="setting-wakelock" class="settings-row" aria-pressed="false">
+            <span class="settings-label">Keep the screen awake</span>
+            <span id="setting-wakelock-state" class="settings-state">Off</span>
+          </button>
+          <button id="setting-qr" class="settings-row">
+            <span class="settings-label">Connect another device</span>
+            <span class="settings-state">Show QR code</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Summoner Spells Bottom Sheet Modal -->
     <div id="modal-spells" class="bottom-sheet-modal hidden">
       <div class="sheet-backdrop" id="sheet-spells-backdrop"></div>
@@ -440,7 +460,7 @@
           <div class="qr-title-box">
             <svg class="qr-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3zm2 2v3h3V5zM14 3h7v7h-7zm2 2v3h3V5zM3 14h7v7H3zm2 2v3h3v-3zM14 14h3v3h-3zm5 0h2v2h-2zm-5 5h2v2h-2zm3 0h4v2h-4z"/></svg>
             <div>
-              <h3 class="qr-modal-title">Connect Smartphone</h3>
+              <h3 class="qr-modal-title">Connect a phone</h3>
               <span class="qr-modal-subtitle">Control League of Legends from your phone</span>
             </div>
           </div>
@@ -478,7 +498,7 @@
 
           <!-- Alternative Adapters dropdown if multiple exist -->
           <div id="qr-adapters-container" class="qr-adapters-box hidden">
-            <label for="qr-adapter-select" class="qr-adapter-label">Select Network Adapter:</label>
+            <label for="qr-adapter-select" class="qr-adapter-label">Network adapter</label>
             <select id="qr-adapter-select" class="hextech-select qr-select">
               <!-- Populated in JS -->
             </select>
@@ -496,6 +516,6 @@
     <div id="toast-container" class="toast-container"></div>
   </div>
 
-  <script src="js/app.js?v=20260906_2"></script>
+  <script src="js/app.js?v=20260906_3"></script>
 </body>
 </html>

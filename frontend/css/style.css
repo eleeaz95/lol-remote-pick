@@ -2525,3 +2525,54 @@ body.hextech-theme {
   fill: var(--gold-metallic);
   flex-shrink: 0;
 }
+
+/* ==========================================================================
+   Settings Sheet
+   ========================================================================== */
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 8px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 4px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid rgba(200, 170, 110, 0.12);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-row:last-child {
+  border-bottom: none;
+}
+
+.settings-row:active {
+  background: rgba(200, 170, 110, 0.06);
+}
+
+.settings-label {
+  font-weight: 500;
+}
+
+.settings-state {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+
+/* An enabled setting is the only thing worth colouring in this list. */
+.settings-row[aria-pressed='true'] .settings-state {
+  color: var(--hex-magic);
+}
