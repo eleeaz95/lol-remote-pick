@@ -317,6 +317,7 @@ class AppHub:
         self._subset_last_try = 0.0
         self._resolved_member_names: Dict[str, str] = {}
         self._member_names_task: Optional[asyncio.Task] = None
+        self._subset_task: Optional[asyncio.Task] = None
         self._is_running = False
         self._last_broadcast_payload: Optional[Dict[str, Any]] = None
 
@@ -372,6 +373,14 @@ class AppHub:
             return
         self._subset_last_try = now
 
+        # Off the event stream: this round trip used to sit in front of every later event, which
+        # held the phone a phase behind whenever the client moved on while the fetch was in flight.
+        if self._subset_task and not self._subset_task.done():
+            return
+        self._subset_task = asyncio.create_task(self._load_subset_champions())
+
+    async def _load_subset_champions(self) -> None:
+        """Fetch the dealt cards and hand them to the state engine."""
         subset = await self.lcu_client.get_subset_champion_list()
         if subset:
             self._subset_ids_loaded = True
@@ -616,8 +625,9 @@ class AppHub:
                 pass
         self.background_tasks.clear()
 
-        if self._member_names_task and not self._member_names_task.done():
-            self._member_names_task.cancel()
+        for task in (self._member_names_task, self._subset_task):
+            if task and not task.done():
+                task.cancel()
 
         # Stop LCU WebSocket
         await self.lcu_ws.stop()
