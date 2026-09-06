@@ -517,10 +517,11 @@ class MockLCUServer:
         self.gameflow_phase = "ReadyCheck"
         self.champ_select = None
 
+        # Mirrors the real client: `timer` counts elapsed seconds up, not the time left.
         self.ready_check = {
             "state": "InProgress",
             "playerResponse": "None",
-            "timer": 10.0,
+            "timer": 0.0,
             "timerDuration": 10.0,
             "declinerIds": [],
             "dodgeWarning": "None",
@@ -900,7 +901,7 @@ class MockLCUServer:
                 # Match Found: Ready Check
                 await self.trigger_ready_check()
                 # Wait 4 seconds then auto accept
-                for t in range(10, 5, -1):
+                for t in range(1, 6):
                     await asyncio.sleep(1.0)
                     if self.ready_check and self.ready_check["state"] == "InProgress":
                         self.ready_check["timer"] = float(t)

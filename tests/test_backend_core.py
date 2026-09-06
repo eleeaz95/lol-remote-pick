@@ -128,7 +128,7 @@ async def test_state_engine_phases_and_normalization():
         {
             "state": "InProgress",
             "playerResponse": "None",
-            "timer": 9.2,
+            "timer": 0.8,
             "timerDuration": 10.0,
         },
     )

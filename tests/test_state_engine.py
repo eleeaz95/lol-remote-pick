@@ -151,17 +151,17 @@ async def test_state_engine_matchmaking_queue_transition():
 
 @pytest.mark.asyncio
 async def test_state_engine_ready_check_states():
-    """Verify ReadyCheck detection, player responses, and player counts."""
+    """Verify ReadyCheck detection, player responses, and the countdown."""
     engine = StateEngine()
     engine.set_connected(True)
 
     ready_data = {
         "state": "InProgress",
         "playerResponse": "None",
-        "timer": 10.0,
+        # The real client counts elapsed seconds up here; the engine must ignore it.
+        "timer": 0.0,
         "dodgeWarning": "None",
-        "numPossibleDeclines": 1,
-        "declinerName": "",
+        "declinerIds": [],
     }
 
     await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ReadyCheck")
@@ -171,15 +171,19 @@ async def test_state_engine_ready_check_states():
     assert state["phase"] == "READY_CHECK"
     assert state["readyCheck"]["state"] == "InProgress"
     assert state["readyCheck"]["playerResponse"] == "None"
-    assert state["readyCheck"]["timer"] == 10.0
+    assert state["readyCheck"]["timerMax"] == 10.0
+    assert 9.0 < state["readyCheck"]["timer"] <= 10.0
 
-    # Simulate player accepting
+    # A later payload for the same ready check keeps counting down from when it started,
+    # no matter what the client reports in its own timer field.
     ready_data_accepted = dict(ready_data)
     ready_data_accepted["playerResponse"] = "Accepted"
+    ready_data_accepted["timer"] = 4.0
     await engine.handle_lcu_event("/lol-matchmaking/v1/ready-check", ready_data_accepted)
 
     state2 = engine.get_state()
     assert state2["readyCheck"]["playerResponse"] == "Accepted"
+    assert 9.0 < state2["readyCheck"]["timer"] <= 10.0
 
 
 @pytest.mark.asyncio

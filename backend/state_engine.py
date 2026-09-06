@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 StateCallback = Callable[[Dict[str, Any]], Awaitable[None]]
 
+# Seconds to accept a match, used when the client does not report a duration of its own.
+READY_CHECK_DURATION = 10.0
+
 QUEUE_NAMES = {
     0: "Custom Game",
     400: "Normal Draft 5v5",
@@ -98,6 +101,7 @@ class StateEngine:
         self._raw_lobby: Optional[Dict[str, Any]] = None
         self._raw_queue: Optional[Dict[str, Any]] = None
         self._raw_ready_check: Optional[Dict[str, Any]] = None
+        self._ready_check_started_at: Optional[float] = None
         self._raw_champ_select: Optional[Dict[str, Any]] = None
         self._raw_gameflow_session: Optional[Dict[str, Any]] = None
 
@@ -159,7 +163,7 @@ class StateEngine:
                     self._gameflow_phase = "None"
                     self._raw_lobby = None
                     self._raw_queue = None
-                    self._raw_ready_check = None
+                    self._set_ready_check(None)
                     self._raw_champ_select = None
                     self._cached_state = None
                     asyncio.create_task(self._emit_state_change())
@@ -176,7 +180,7 @@ class StateEngine:
                 self._gameflow_phase = "None"
                 self._raw_lobby = None
                 self._raw_queue = None
-                self._raw_ready_check = None
+                self._set_ready_check(None)
                 self._raw_champ_select = None
                 self._cached_state = None
             await self._emit_state_change()
@@ -211,7 +215,7 @@ class StateEngine:
                 self._gameflow_phase = phase_val
                 # Clear transient states based on new phase
                 if phase_val in ("ChampSelect", "InProgress", "GameStart", "None", "Lobby"):
-                    self._raw_ready_check = None
+                    self._set_ready_check(None)
                     self._raw_queue = None
                 if phase_val in ("None", "Lobby", "InProgress", "GameStart"):
                     self._raw_champ_select = None
@@ -290,9 +294,9 @@ class StateEngine:
                     state_changed = True
             elif "/lol-matchmaking/v1/ready-check" in uri:
                 if event_type == "Delete":
-                    self._raw_ready_check = None
+                    self._set_ready_check(None)
                 elif isinstance(data, dict):
-                    self._raw_ready_check = data
+                    self._set_ready_check(data)
                 state_changed = True
             elif "/lol-champ-select/v1/session/my-selection" in uri or "/my-selection" in uri:
                 if isinstance(data, dict):
@@ -395,7 +399,7 @@ class StateEngine:
             if qname:
                 self._active_queue_name = str(qname)
         if ready_check is not None:
-            self._raw_ready_check = ready_check
+            self._set_ready_check(ready_check)
         if champ_select is not None:
             self._raw_champ_select = champ_select
 
@@ -407,6 +411,13 @@ class StateEngine:
         if self._cached_state is not None:
             res = copy.deepcopy(self._cached_state)
             res["serverTime"] = time.time()
+            # The countdown keeps running even when nothing else about the state changed,
+            # so a phone that connects mid ready check gets the real time left.
+            cached_ready_check = res.get("readyCheck")
+            if cached_ready_check:
+                cached_ready_check["timer"] = self._ready_check_time_left(
+                    cached_ready_check.get("timerMax", READY_CHECK_DURATION)
+                )
             return res
         # 1. Compute Phase
         computed_phase = self._compute_normalized_phase()
@@ -603,6 +614,33 @@ class StateEngine:
             "estimatedTime": est_time,
         }
 
+    def _set_ready_check(self, data: Optional[Dict[str, Any]]) -> None:
+        """Store the raw ready check, stamping when a new one started.
+
+        The remaining time is derived from that stamp rather than from the LCU payload: the
+        client's own `timer` field counts elapsed seconds up, so forwarding it made the phone
+        re-sync to a growing number every poll.
+        """
+        in_progress = bool(data) and data.get("state") == "InProgress"
+        was_in_progress = bool(self._raw_ready_check) and self._raw_ready_check.get("state") == "InProgress"
+
+        if in_progress and not was_in_progress:
+            self._ready_check_started_at = time.monotonic()
+        elif not in_progress:
+            self._ready_check_started_at = None
+
+        self._raw_ready_check = data
+
+    def _ready_check_time_left(self, timer_max: float) -> float:
+        """Seconds left to accept, counted from when this ready check started.
+
+        Zero when no check is running, so an idle snapshot stays byte-identical between
+        reads and does not defeat emission deduplication.
+        """
+        if self._ready_check_started_at is None:
+            return 0.0
+        return max(0.0, timer_max - (time.monotonic() - self._ready_check_started_at))
+
     def _normalize_ready_check(self) -> Dict[str, Any]:
         """Normalize ready check popup info."""
         if not self._raw_ready_check:
@@ -610,13 +648,14 @@ class StateEngine:
                 "state": "None",
                 "playerResponse": "None",
                 "timer": 0.0,
-                "timerMax": 10.0,
+                "timerMax": READY_CHECK_DURATION,
             }
 
         state = self._raw_ready_check.get("state", "None")
         response = self._raw_ready_check.get("playerResponse", "None")
-        timer = float(self._raw_ready_check.get("timer", 0.0))
-        timer_max = float(self._raw_ready_check.get("timerDuration", 10.0) or 10.0)
+        timer_max = float(self._raw_ready_check.get("timerDuration", 0.0) or READY_CHECK_DURATION)
+
+        timer = self._ready_check_time_left(timer_max)
 
         # Some LCU versions provide playerResponse as boolean or Accepted/Declined string
         if response is True:

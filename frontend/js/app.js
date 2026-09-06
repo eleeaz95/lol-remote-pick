@@ -843,17 +843,10 @@
       };
 
       if (state.phase === 'READY_CHECK' && state.readyCheck.state === 'InProgress') {
-        const serverLeftMs = (state.readyCheck.timer !== undefined ? state.readyCheck.timer : 10) * 1000;
-        const newTargetEndMs = Date.now() + serverLeftMs;
-
+        // Sync once, when this ready check starts, then let the countdown run on its own.
+        // Re-syncing on every snapshot made the number jump around.
         if (!localState.readyCheckTargetEndMs || localState.lastReadyCheckState !== 'InProgress') {
-          localState.readyCheckTargetEndMs = newTargetEndMs;
-        } else {
-          const currentRemainingMs = Math.max(0, localState.readyCheckTargetEndMs - Date.now());
-          const drift = Math.abs(currentRemainingMs - serverLeftMs);
-          if (drift > 2000) {
-            localState.readyCheckTargetEndMs = newTargetEndMs;
-          }
+          localState.readyCheckTargetEndMs = Date.now() + state.readyCheck.timer * 1000;
         }
         localState.lastReadyCheckState = 'InProgress';
       } else {
@@ -1305,6 +1298,8 @@
     const progressFill = document.getElementById('ready-progress-fill');
 
     if (!localState.readyCheckTargetEndMs) {
+      // Once the check is over, leave the last number alone instead of flashing a full timer.
+      if (state.readyCheck.state !== 'InProgress') return;
       const serverLeft = state.readyCheck.timer !== undefined ? state.readyCheck.timer : 10;
       localState.readyCheckTargetEndMs = Date.now() + serverLeft * 1000;
     }
