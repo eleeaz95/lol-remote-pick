@@ -945,11 +945,18 @@ def create_app(custom_settings: Optional[Settings] = None) -> FastAPI:
         app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
         # Root index route
+        NO_CACHE_HEADERS = {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+
+        # Root index route
         @app.get("/")
         async def serve_root():
             index_file = static_path / "index.html"
             if index_file.is_file():
-                return FileResponse(str(index_file))
+                return FileResponse(str(index_file), headers=NO_CACHE_HEADERS)
             return JSONResponse({"message": "LoL Remote Pick Backend running"})
 
         # Catch-all route for SPA navigation (HTML5 pushState) and direct assets
@@ -965,14 +972,14 @@ def create_app(custom_settings: Optional[Settings] = None) -> FastAPI:
                 # Prevent directory traversal by resolving path and verifying containment
                 target_file = (static_path / full_path).resolve()
                 if target_file.is_relative_to(resolved_static_path) and target_file.is_file():
-                    return FileResponse(str(target_file))
+                    return FileResponse(str(target_file), headers=NO_CACHE_HEADERS)
             except (ValueError, RuntimeError):
                 pass
 
             # Fallback to index.html for SPA routes
             index_file = resolved_static_path / "index.html"
             if index_file.is_file():
-                return FileResponse(str(index_file))
+                return FileResponse(str(index_file), headers=NO_CACHE_HEADERS)
 
             raise HTTPException(status_code=404, detail="File Not Found")
     else:
