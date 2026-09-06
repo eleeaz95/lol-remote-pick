@@ -1753,6 +1753,16 @@
   }
 
   // Champion Grid & Search Rendering
+  // The role tabs are labelled with the client's position names; the champion catalog names the
+  // same lanes its own way, so MID and UTILITY need translating or those tabs come up empty.
+  const ROLE_TAB_TO_LANE = {
+    TOP: 'TOP',
+    JUNGLE: 'JUNGLE',
+    MIDDLE: 'MID',
+    BOTTOM: 'BOTTOM',
+    UTILITY: 'SUPPORT',
+  };
+
   function renderChampionsGrid() {
     const grid = document.getElementById('champions-grid');
     if (!grid) return;
@@ -1766,7 +1776,8 @@
     const filtered = localState.champions.filter((champ) => {
       const matchesSearch =
         !query || champ.name.toLowerCase().includes(query) || champ.key.toLowerCase().includes(query);
-      const matchesRole = filterRole === 'ALL' || champ.roles.includes(filterRole);
+      const lane = ROLE_TAB_TO_LANE[filterRole] || filterRole;
+      const matchesRole = filterRole === 'ALL' || champ.roles.includes(lane);
       return matchesSearch && matchesRole;
     });
 

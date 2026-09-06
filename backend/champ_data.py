@@ -540,18 +540,23 @@ class ChampionCatalog:
                             cid = int(champ_obj.get("key", 0))
                             if cid <= 0:
                                 continue
-                            tags = champ_obj.get("tags", [])
-                            roles = []
-                            for tag in tags:
-                                t = tag.lower()
-                                if t == "fighter" and "top" not in roles:
-                                    roles.append("top")
-                                elif t in ("mage", "assassin") and "mid" not in roles:
-                                    roles.append("mid")
-                                elif t == "marksman" and "bottom" not in roles:
-                                    roles.append("bottom")
-                                elif t in ("support", "tank") and "support" not in roles:
-                                    roles.append("support")
+                            # DataDragon only publishes champion classes (Fighter, Mage...), which say
+                            # nothing about lanes: deriving roles from them loses the jungle entirely and
+                            # files every tank under support. The curated lanes above win whenever we have
+                            # them; the tags are a last resort for a champion released after this catalog.
+                            existing = self._champions.get(cid)
+                            roles = list(existing.get("roles") or []) if existing else []
+                            if not roles:
+                                for tag in champ_obj.get("tags", []):
+                                    t = tag.lower()
+                                    if t == "fighter" and "top" not in roles:
+                                        roles.append("top")
+                                    elif t in ("mage", "assassin") and "mid" not in roles:
+                                        roles.append("mid")
+                                    elif t == "marksman" and "bottom" not in roles:
+                                        roles.append("bottom")
+                                    elif t in ("support", "tank") and "support" not in roles:
+                                        roles.append("support")
                             if not roles:
                                 roles = ["mid"]
 
