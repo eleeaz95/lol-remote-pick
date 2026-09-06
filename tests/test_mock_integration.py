@@ -307,10 +307,15 @@ async def test_aram_champ_select_bench_swap(mock_app_and_client):
     await hub.mock_server.trigger_lobby(queue_id=450)
     await hub.mock_server.trigger_champ_select(queue_id=450)
     await hub.mock_server.open_bench_pool()
-    await asyncio.sleep(0.05)
 
-    state = (await client.get("/api/state")).json()
-    cs = state["champSelect"]
+    # Wait for the pool event itself rather than a fixed delay: several session events are in
+    # flight here and the last one is what this test is about.
+    cs = {}
+    for _ in range(40):
+        await asyncio.sleep(0.05)
+        cs = (await client.get("/api/state")).json()["champSelect"]
+        if cs.get("localPickCompleted"):
+            break
     assert cs["pickMode"] == "BENCH"
     assert cs["benchEnabled"] is True
     assert cs["bans"]["myTeamBans"] == []
