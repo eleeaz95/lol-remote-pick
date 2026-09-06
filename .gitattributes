@@ -1,0 +1,8 @@
+# Keep LF in the working tree on every platform: ruff and prettier both assume it,
+# and a CRLF checkout makes their --check runs fail locally on Windows only.
+* text=auto eol=lf
+
+# Binary assets must never be touched.
+*.png binary
+*.ico binary
+*.zip binary
