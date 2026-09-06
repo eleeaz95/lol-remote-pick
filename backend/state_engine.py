@@ -42,14 +42,21 @@ QUEUE_NAMES = {
 BENCH_QUEUE_IDS = {450, 720, 721, 2400, 2450, 3220, 3270, 3280}
 
 
-def _extract_bench(session: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Normalize the shared champion bench, accepting object or plain-id LCU payloads."""
+def _extract_bench(session: Dict[str, Any], dealt_cards: Optional[List[int]] = None) -> List[Dict[str, Any]]:
+    """Normalize the shared champion bench, accepting object or plain-id LCU payloads.
+
+    `dealt_cards` are the champions offered in card-selection modes. They are kept outside the
+    session because the client republishes the whole session on every timer tick, which would
+    otherwise wipe them a second after they were fetched.
+    """
     raw = session.get("benchChampions")
     if raw is None:
         raw = session.get("benchChampionIds")
 
     subset_ids: Set[int] = set()
-    raw_subsets = session.get("subsetChampionIds") or []
+    raw_subsets = list(session.get("subsetChampionIds") or [])
+    if session.get("allowSubsetChampionPicks"):
+        raw_subsets.extend(dealt_cards or [])
     for s in raw_subsets:
         try:
             val = int(s)
@@ -76,7 +83,7 @@ def _extract_bench(session: Dict[str, Any]) -> List[Dict[str, Any]]:
         seen.add(champion_id)
         bench.append({"championId": champion_id, "isPriority": is_priority})
 
-    # Ensure all subsetChampionIds are present on the bench as priority cards
+    # The dealt cards are pickable even before the shared bench exists, so list them too
     for sid in subset_ids:
         if sid not in seen:
             seen.add(sid)
@@ -103,6 +110,7 @@ class StateEngine:
         self._raw_ready_check: Optional[Dict[str, Any]] = None
         self._ready_check_started_at: Optional[float] = None
         self._raw_champ_select: Optional[Dict[str, Any]] = None
+        self._dealt_card_ids: List[int] = []
         self._raw_gameflow_session: Optional[Dict[str, Any]] = None
 
         # Background timers for smoothing transient events
@@ -165,6 +173,7 @@ class StateEngine:
                     self._raw_queue = None
                     self._set_ready_check(None)
                     self._raw_champ_select = None
+                    self._dealt_card_ids = []
                     self._cached_state = None
                     asyncio.create_task(self._emit_state_change())
             else:
@@ -182,6 +191,7 @@ class StateEngine:
                 self._raw_queue = None
                 self._set_ready_check(None)
                 self._raw_champ_select = None
+                self._dealt_card_ids = []
                 self._cached_state = None
             await self._emit_state_change()
         except asyncio.CancelledError:
@@ -219,6 +229,7 @@ class StateEngine:
                     self._raw_queue = None
                 if phase_val in ("None", "Lobby", "InProgress", "GameStart"):
                     self._raw_champ_select = None
+                    self._dealt_card_ids = []
                 if phase_val == "None":
                     if self._lobby_delete_task and not self._lobby_delete_task.done():
                         self._lobby_delete_task.cancel()
@@ -308,6 +319,7 @@ class StateEngine:
             elif "/lol-champ-select/v1/session" in uri:
                 if event_type == "Delete":
                     self._raw_champ_select = None
+                    self._dealt_card_ids = []
                 elif isinstance(data, dict):
                     old_my_selection = (
                         self._raw_champ_select.get("mySelection") if isinstance(self._raw_champ_select, dict) else None
@@ -340,10 +352,10 @@ class StateEngine:
             if champion_id > 0 and champion_id not in clean:
                 clean.append(champion_id)
 
-        if self._raw_champ_select.get("subsetChampionIds") == clean:
+        if self._dealt_card_ids == clean:
             return
 
-        self._raw_champ_select["subsetChampionIds"] = clean
+        self._dealt_card_ids = clean
         self._cached_state = None
         asyncio.create_task(self._emit_state_change())
 
@@ -677,6 +689,8 @@ class StateEngine:
         # 1. Direct positive indicators
         if session.get("benchEnabled") is True:
             return True
+        if session.get("allowSubsetChampionPicks") is True:
+            return True
         if bench:
             return True
 
@@ -983,7 +997,7 @@ class StateEngine:
                     break
 
         # 7. Bench / random-pick modes (ARAM and variants)
-        bench = _extract_bench(session)
+        bench = _extract_bench(session, self._dealt_card_ids)
         bench_enabled = self._detect_bench_mode(session, bench)
 
         return {

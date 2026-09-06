@@ -369,6 +369,39 @@ async def test_aram_mayhem_lobby_and_champ_select(mock_app_and_client):
     assert cs["bans"]["myTeamBans"] == []
 
 
+async def _wait_for_dealt_cards(client, timeout: float = 2.0) -> dict:
+    """Wait for the cards fetched behind the REST route to reach the normalized state."""
+    deadline = timeout
+    cs = {}
+    while deadline > 0:
+        await asyncio.sleep(0.05)
+        deadline -= 0.05
+        cs = (await client.get("/api/state")).json()["champSelect"]
+        if any(entry["isPriority"] for entry in cs["bench"]):
+            return cs
+    return cs
+
+
+@pytest.mark.asyncio
+async def test_dealt_cards_survive_further_session_events(mock_app_and_client):
+    """The client republishes the whole session every timer tick; the cards must not wash away."""
+    app, client, hub = mock_app_and_client
+
+    await hub.mock_server.trigger_lobby(queue_id=2400)
+    await hub.mock_server.trigger_champ_select(queue_id=2400)
+    await _wait_for_dealt_cards(client)
+
+    # A plain timer tick, exactly as the client sends it
+    hub.mock_server.champ_select["timer"]["adjustedTimeLeftInPhase"] = 20.0
+    await hub.mock_server.broadcast_event("/lol-champ-select/v1/session", hub.mock_server.champ_select)
+    await asyncio.sleep(0.1)
+
+    bench = (await client.get("/api/state")).json()["champSelect"]["bench"]
+    dealt = [entry["championId"] for entry in bench if entry["isPriority"]]
+    for champion_id in hub.mock_server.subset_champion_ids:
+        assert champion_id in dealt, f"card {champion_id} was dropped by a later session event"
+
+
 @pytest.mark.asyncio
 async def test_card_selection_champions_arrive_over_the_websocket(mock_app_and_client):
     """The dealt cards must reach the phone as soon as champ select opens.
