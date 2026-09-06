@@ -91,7 +91,10 @@ html,
 body {
   width: 100%;
   height: 100%;
-  height: 100dvh;
+  /* Small viewport height, not dynamic: the app shell never scrolls as a page, so the browser
+     bar stays out, and 100dvh would size the shell to the tall viewport and push the bottom of
+     the screen - the end of the champion pool - underneath Safari's bar where nothing reaches it. */
+  height: 100svh;
   overflow: hidden;
   background-color: var(--bg-obsidian);
   color: var(--text-main);
@@ -110,7 +113,7 @@ body.hextech-theme {
   flex-direction: column;
   width: 100%;
   height: 100%;
-  height: 100dvh;
+  height: 100svh;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: env(safe-area-inset-left, 0px);
