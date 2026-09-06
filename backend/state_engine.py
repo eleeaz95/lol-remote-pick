@@ -1003,6 +1003,11 @@ class StateEngine:
         bench = _extract_bench(session, self._dealt_card_ids)
         bench_enabled = self._detect_bench_mode(session, bench)
 
+        # The champion already assigned to the player is not something they can pick or swap into
+        my_champion_id = next((p["championId"] for p in my_team if p["isLocalPlayer"]), 0)
+        if my_champion_id:
+            bench = [entry for entry in bench if entry["championId"] != my_champion_id]
+
         return {
             "sessionActive": True,
             "cellId": local_cell_id,
