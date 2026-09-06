@@ -400,6 +400,15 @@ class AppHub:
                                 logger.warning("League Client process exited")
                                 last_had_creds = False
                                 self.state_engine.set_connected(False)
+                            elif not self.state_engine.has_summoner():
+                                # The summoner endpoint stays unavailable until the client finishes signing
+                                # in, so the one-shot fetch on discovery can come back empty. The LCU only
+                                # emits current-summoner events when the profile changes, so nothing would
+                                # ever fill it in. Keep retrying until it lands.
+                                summoner = await self.lcu_client.get_summoner()
+                                if summoner:
+                                    logger.info("Fetched summoner profile after a delayed client sign-in")
+                                    self.state_engine.update_from_poll(summoner=summoner)
                         else:
                             # Fallback HTTP polling when WebSocket is disconnected
                             phase = await self.lcu_client.get_gameflow_phase()

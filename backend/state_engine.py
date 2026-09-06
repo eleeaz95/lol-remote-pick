@@ -442,6 +442,10 @@ class StateEngine:
 
         return "NONE"
 
+    def has_summoner(self) -> bool:
+        """True once the summoner profile has been fetched from the client."""
+        return bool(self._raw_summoner)
+
     def _normalize_summoner(self) -> Dict[str, Any]:
         """Normalize summoner profile."""
         if not self._raw_summoner:

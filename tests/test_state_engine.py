@@ -656,3 +656,32 @@ async def test_state_engine_aram_mayhem_queue_2400():
     assert len(cs["bench"]) == 3
     assert cs["bench"][0]["championId"] == 22
     assert cs["bench"][0]["isPriority"] is True
+
+
+async def test_state_engine_reports_missing_summoner_until_fetched():
+    """has_summoner() gates the poll-loop retry that recovers a profile fetched too early."""
+    engine = StateEngine()
+    engine.set_connected(True)
+
+    assert engine.has_summoner() is False
+    state = engine.get_state()
+    assert state["summoner"]["displayName"] == ""
+    assert state["summoner"]["profileIconId"] == 0
+    assert state["summoner"]["summonerLevel"] == 1
+
+    engine.update_from_poll(
+        summoner={
+            "displayName": "",
+            "gameName": "Eleeaz",
+            "tagLine": "LAS",
+            "profileIconId": 3456,
+            "summonerLevel": 456,
+        }
+    )
+
+    assert engine.has_summoner() is True
+    state = engine.get_state()
+    # Modern clients leave displayName empty and carry the Riot ID in gameName/tagLine
+    assert state["summoner"]["displayName"] == "Eleeaz#LAS"
+    assert state["summoner"]["profileIconId"] == 3456
+    assert state["summoner"]["summonerLevel"] == 456
