@@ -2295,3 +2295,101 @@ body.hextech-theme {
   border-radius: var(--radius-sm);
   padding: 8px 10px;
 }
+
+/* ==========================================================================
+   In-Game Match Roster
+   ========================================================================== */
+
+.in-game-rosters {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  margin-top: 20px;
+}
+
+.ig-team {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ig-team-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--hex-gold, #c8aa6e);
+  opacity: 0.85;
+}
+
+.ig-team-label.enemy {
+  color: #e0576b;
+}
+
+.ig-team-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ig-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 56px;
+  flex: 1 1 0;
+}
+
+.ig-slot-img-box {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid rgba(200, 170, 110, 0.35);
+  background: #091428;
+}
+
+.ig-slot.is-you .ig-slot-img-box {
+  border-color: #0ac8b9;
+  box-shadow: 0 0 10px rgba(10, 200, 185, 0.5);
+}
+
+.ig-slot-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ig-you-badge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: center;
+  background: rgba(10, 200, 185, 0.9);
+  color: #091428;
+}
+
+.ig-slot-name {
+  font-size: 0.6rem;
+  text-align: center;
+  color: #f0e6d2;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ig-slot-pos {
+  font-size: 0.52rem;
+  letter-spacing: 0.06em;
+  color: rgba(240, 230, 210, 0.55);
+}

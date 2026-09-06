@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260905_3">
+  <link rel="stylesheet" href="css/style.css?v=20260906_1">
 </head>
 <body class="hextech-theme">
   <div id="app" class="app-container">
@@ -405,6 +405,18 @@
             <img id="in-game-champ-icon" class="in-game-avatar" src="" alt="Champion" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23091428%22/><circle cx=%2250%22 cy=%2250%22 r=%2230%22 fill=%22%23c8aa6e%22/></svg>'">
             <span id="in-game-champ-name" class="in-game-champ-name">Champion</span>
           </div>
+
+          <!-- Live match roster, from the gameflow session -->
+          <div id="in-game-rosters" class="in-game-rosters hidden">
+            <div class="ig-team">
+              <span class="ig-team-label ally">YOUR TEAM</span>
+              <div id="in-game-ally-team" class="ig-team-row"></div>
+            </div>
+            <div class="ig-team">
+              <span class="ig-team-label enemy">ENEMY TEAM</span>
+              <div id="in-game-enemy-team" class="ig-team-row"></div>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -488,6 +500,6 @@
     <div id="toast-container" class="toast-container"></div>
   </div>
 
-  <script src="js/app.js?v=20260905_4"></script>
+  <script src="js/app.js?v=20260906_1"></script>
 </body>
 </html>

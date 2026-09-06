@@ -731,3 +731,89 @@ async def test_state_engine_lobby_member_uses_riot_id_and_icon():
     # Other members still get their avatar; naming them needs a puuid lookup the engine cannot do
     assert members[1]["isLocalMember"] is False
     assert members[1]["profileIconId"] == 12
+
+
+async def test_state_engine_in_game_roster_from_gameflow_session():
+    """The live match roster comes from gameData teams, with the local side detected by puuid."""
+    engine = StateEngine()
+    engine.set_connected(True)
+    engine.update_from_poll(summoner={"gameName": "Eleeaz", "tagLine": "LAS", "puuid": "me-1", "summonerId": 833435})
+
+    await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "InProgress")
+    await engine.handle_lcu_event(
+        "/lol-gameflow/v1/session",
+        {
+            "phase": "InProgress",
+            "gameData": {
+                "queue": {"id": 2400, "name": "ARAM: Mayhem", "gameMode": "KIWI"},
+                # Shape taken from a live client: names empty, local player on teamTwo, uneven sides
+                "teamOne": [
+                    {"championId": 127, "profileIconId": 6484, "selectedPosition": "NONE", "puuid": "enemy-1"},
+                    {"championId": 432, "profileIconId": 4649, "selectedPosition": "NONE", "puuid": "enemy-2"},
+                ],
+                "teamTwo": [
+                    {"championId": 11, "profileIconId": 3456, "selectedPosition": "NONE", "puuid": "me-1"},
+                    {"championId": 79, "profileIconId": 5602, "selectedPosition": "MIDDLE", "puuid": "ally-1"},
+                    {"championId": 904, "profileIconId": 15, "selectedPosition": "NONE", "puuid": "ally-2"},
+                ],
+            },
+        },
+    )
+
+    state = engine.get_state()
+    assert state["phase"] == "IN_GAME"
+    in_game = state["inGame"]
+    assert in_game["queueId"] == 2400
+    assert in_game["queueName"] == "ARAM: Mayhem"
+    # The local player sits on teamTwo, so that side is reported as "mine"
+    assert in_game["myChampionId"] == 11
+    assert [p["championId"] for p in in_game["myTeam"]] == [11, 79, 904]
+    assert [p["championId"] for p in in_game["theirTeam"]] == [127, 432]
+    assert in_game["myTeam"][0]["isLocalPlayer"] is True
+    assert in_game["myTeam"][1]["isLocalPlayer"] is False
+    assert in_game["myTeam"][0]["profileIconId"] == 3456
+    # "NONE" is not a position worth showing; a real lane is kept
+    assert in_game["myTeam"][0]["position"] == ""
+    assert in_game["myTeam"][1]["position"] == "MIDDLE"
+
+
+async def test_state_engine_in_game_roster_empty_without_session():
+    """No gameflow teams means an empty roster rather than a half-filled one."""
+    engine = StateEngine()
+    engine.set_connected(True)
+    await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "InProgress")
+
+    in_game = engine.get_state()["inGame"]
+    assert in_game["myTeam"] == []
+    assert in_game["theirTeam"] == []
+    assert in_game["myChampionId"] == 0
+
+
+async def test_state_engine_in_game_roster_cleared_after_the_match():
+    """The gameflow session outlives the match, so the roster must not leak into the next lobby."""
+    engine = StateEngine()
+    engine.set_connected(True)
+    engine.update_from_poll(summoner={"gameName": "Eleeaz", "puuid": "me-1"})
+
+    await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "InProgress")
+    await engine.handle_lcu_event(
+        "/lol-gameflow/v1/session",
+        {
+            "phase": "InProgress",
+            "gameData": {
+                "queue": {"id": 450},
+                "teamOne": [{"championId": 11, "puuid": "me-1"}],
+                "teamTwo": [{"championId": 24, "puuid": "enemy-1"}],
+            },
+        },
+    )
+    assert engine.get_state()["inGame"]["myTeam"] != []
+
+    # Back to a lobby: the client keeps serving the finished match's session
+    await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "Lobby")
+    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {"gameConfig": {"queueId": 450}, "members": []})
+
+    state = engine.get_state()
+    assert state["phase"] == "LOBBY"
+    assert state["inGame"]["myTeam"] == []
+    assert state["inGame"]["theirTeam"] == []

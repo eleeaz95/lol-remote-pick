@@ -66,6 +66,13 @@
       benchEnabled: false,
       bench: [], // [{ championId, isPriority }]
     },
+    inGame: {
+      queueId: 0,
+      queueName: '',
+      myChampionId: 0,
+      myTeam: [], // [{ championId, profileIconId, position, isLocalPlayer }]
+      theirTeam: [],
+    },
   };
 
   // Local UI State
@@ -913,6 +920,25 @@
       localState.lastCsActionId = null;
       localState.lastCsPhase = null;
       localState.lastCsDisplayedSec = -1;
+    }
+
+    // Live match roster (players carry no name: see the backend normalizer)
+    if (payload.inGame) {
+      const ig = payload.inGame;
+      const normalizeTeam = (team) =>
+        (Array.isArray(team) ? team : []).map((p) => ({
+          championId: Number(p.championId) || 0,
+          profileIconId: Number(p.profileIconId) || 0,
+          position: (p.position || '').toUpperCase(),
+          isLocalPlayer: Boolean(p.isLocalPlayer),
+        }));
+      state.inGame = {
+        queueId: Number(ig.queueId) || 0,
+        queueName: ig.queueName || '',
+        myChampionId: Number(ig.myChampionId) || 0,
+        myTeam: normalizeTeam(ig.myTeam),
+        theirTeam: normalizeTeam(ig.theirTeam),
+      };
     }
 
     // Process State Transitions & Audio/Vibration Triggers
@@ -1857,15 +1883,47 @@
 
   // 6. In-Game View
   function renderInGameView() {
-    const champId = state.champSelect.mySelection.selectedChampionId;
-    const champ = localState.championsMap.get(champId);
+    // The gameflow roster is authoritative here: champ select state is cleared once the game starts,
+    // so a phone connecting mid-game has nothing else to read the local champion from.
+    const champId = state.inGame.myChampionId || state.champSelect.mySelection.selectedChampionId;
+    const champ = getChampion(champId);
     const champIcon = document.getElementById('in-game-champ-icon');
     const champName = document.getElementById('in-game-champ-name');
 
     if (champ && champIcon && champName) {
-      champIcon.src = getChampionIconUrl(champ.key);
+      champIcon.src = getChampionIconUrl(champ.key, champ.id);
       champName.textContent = champ.name;
     }
+
+    const hasRoster = state.inGame.myTeam.length > 0 || state.inGame.theirTeam.length > 0;
+    toggleElementById('in-game-rosters', hasRoster);
+    if (!hasRoster) return;
+
+    renderInGameTeam('in-game-ally-team', state.inGame.myTeam);
+    renderInGameTeam('in-game-enemy-team', state.inGame.theirTeam);
+  }
+
+  function renderInGameTeam(rowId, team) {
+    const row = document.getElementById(rowId);
+    if (!row) return;
+
+    row.innerHTML = '';
+    team.forEach((player) => {
+      const champion = getChampion(player.championId);
+      const slot = document.createElement('div');
+      slot.className = `ig-slot${player.isLocalPlayer ? ' is-you' : ''}`;
+      const label = champion ? escapeHtml(champion.name) : 'Unknown';
+      const icon = champion ? getChampionIconUrl(champion.key, champion.id) : '';
+      slot.innerHTML = `
+        <div class="ig-slot-img-box">
+          ${icon ? `<img class="ig-slot-img" src="${icon}" alt="${label}" loading="lazy">` : '<div class="slot-empty-avatar"></div>'}
+          ${player.isLocalPlayer ? '<span class="ig-you-badge">YOU</span>' : ''}
+        </div>
+        <span class="ig-slot-name">${label}</span>
+        ${player.position ? `<span class="ig-slot-pos">${escapeHtml(player.position)}</span>` : ''}
+      `;
+      row.appendChild(slot);
+    });
   }
 
   // =========================================================================

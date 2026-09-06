@@ -174,6 +174,7 @@ class MockLCUServer:
         self.queue_search: Optional[Dict[str, Any]] = None
         self.ready_check: Optional[Dict[str, Any]] = None
         self.champ_select: Optional[Dict[str, Any]] = None
+        self.game_teams: Optional[Dict[str, Any]] = None
 
         self._setup_routes()
 
@@ -241,7 +242,8 @@ class MockLCUServer:
             return {
                 "phase": self.gameflow_phase,
                 "gameData": {
-                    "queue": {"id": self.lobby.get("gameConfig", {}).get("queueId", 420) if self.lobby else 0}
+                    "queue": {"id": self.lobby.get("gameConfig", {}).get("queueId", 420) if self.lobby else 0},
+                    **(self.game_teams or {}),
                 },
             }
 
@@ -442,6 +444,7 @@ class MockLCUServer:
         self.queue_search = None
         self.ready_check = None
         self.champ_select = None
+        self.game_teams = None
 
         await self.broadcast_event("/lol-gameflow/v1/gameflow-phase", "None")
         await self.broadcast_event("/lol-lobby/v2/lobby", None, event_type="Delete")
@@ -455,6 +458,7 @@ class MockLCUServer:
         self.queue_search = None
         self.ready_check = None
         self.champ_select = None
+        self.game_teams = None
 
         self.lobby = {
             "gameConfig": {
@@ -826,9 +830,49 @@ class MockLCUServer:
         """Transition to IN_GAME state."""
         self.gameflow_phase = "InProgress"
         self.champ_select = None
+        self.game_teams = self._build_game_teams()
 
         await self.broadcast_event("/lol-gameflow/v1/gameflow-phase", "InProgress")
         await self.broadcast_event("/lol-champ-select/v1/session", None, event_type="Delete")
+        await self.broadcast_event(
+            "/lol-gameflow/v1/session",
+            {
+                "phase": "InProgress",
+                "gameData": {
+                    "queue": {"id": self.lobby.get("gameConfig", {}).get("queueId", 420) if self.lobby else 0},
+                    **self.game_teams,
+                },
+            },
+        )
+
+    def _build_game_teams(self) -> Dict[str, Any]:
+        """Roster shaped like a live gameflow session: champion ids, no player names."""
+        allies = [32, 64, 103, 222, 412]
+        enemies = [266, 84, 157, 238, 99]
+        return {
+            "teamOne": [
+                {
+                    "championId": champion_id,
+                    "profileIconId": 500 + index,
+                    "selectedPosition": "NONE",
+                    "puuid": self.summoner["puuid"] if index == 0 else f"mock-ally-{index}",
+                    "summonerId": self.summoner["summonerId"] if index == 0 else 900000 + index,
+                    "summonerName": "",
+                }
+                for index, champion_id in enumerate(allies)
+            ],
+            "teamTwo": [
+                {
+                    "championId": champion_id,
+                    "profileIconId": 600 + index,
+                    "selectedPosition": "NONE",
+                    "puuid": f"mock-enemy-{index}",
+                    "summonerId": 800000 + index,
+                    "summonerName": "",
+                }
+                for index, champion_id in enumerate(enemies)
+            ],
+        }
 
     # --- Simulation Auto-Progression Loop ---
 

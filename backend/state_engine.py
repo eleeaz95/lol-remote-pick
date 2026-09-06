@@ -406,6 +406,7 @@ class StateEngine:
             "queue": queue,
             "readyCheck": ready_check,
             "champSelect": champ_select,
+            "inGame": self._normalize_in_game(),
         }
 
         self._cached_state = state
@@ -664,6 +665,74 @@ class StateEngine:
             return True
 
         return False
+
+    def _normalize_in_game(self) -> Dict[str, Any]:
+        """Normalize the live match roster from the gameflow session."""
+        empty: Dict[str, Any] = {"queueId": 0, "queueName": "", "myChampionId": 0, "myTeam": [], "theirTeam": []}
+
+        # The gameflow session outlives the match it describes, so the roster is only reported while a
+        # game is actually running - otherwise the last match would linger into the next lobby.
+        if self._compute_normalized_phase() != "IN_GAME":
+            return empty
+
+        game_data = (self._raw_gameflow_session or {}).get("gameData") or {}
+        team_one = game_data.get("teamOne") or []
+        team_two = game_data.get("teamTwo") or []
+        if not team_one and not team_two:
+            return empty
+
+        local_puuid = self._raw_summoner.get("puuid")
+        local_sum_id = self._raw_summoner.get("summonerId")
+
+        def is_local(player: Dict[str, Any]) -> bool:
+            return bool(
+                (local_puuid and player.get("puuid") == local_puuid)
+                or (local_sum_id and player.get("summonerId") == local_sum_id)
+            )
+
+        def normalize(team: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            players = []
+            for player in team:
+                if not isinstance(player, dict):
+                    continue
+                try:
+                    champion_id = int(player.get("championId") or 0)
+                except (TypeError, ValueError):
+                    champion_id = 0
+                position = str(player.get("selectedPosition") or "").upper()
+                players.append(
+                    {
+                        "championId": champion_id,
+                        # Player names are deliberately absent: live payloads leave summonerName empty
+                        # since the Riot ID migration, and rebuilding them needs a lookup per puuid.
+                        "profileIconId": player.get("profileIconId", 0),
+                        "position": "" if position == "NONE" else position,
+                        "isLocalPlayer": is_local(player),
+                    }
+                )
+            return players
+
+        side_one, side_two = normalize(team_one), normalize(team_two)
+        # Whichever side lists the local player is "mine"; teamOne stands in when the profile has not
+        # been fetched yet and nobody can be matched.
+        if any(p["isLocalPlayer"] for p in side_two):
+            my_team, their_team = side_two, side_one
+        else:
+            my_team, their_team = side_one, side_two
+
+        queue = game_data.get("queue") or {}
+        try:
+            queue_id = int(queue.get("id") or self._active_queue_id or 0)
+        except (TypeError, ValueError):
+            queue_id = 0
+
+        return {
+            "queueId": queue_id,
+            "queueName": queue.get("name") or QUEUE_NAMES.get(queue_id, ""),
+            "myChampionId": next((p["championId"] for p in my_team if p["isLocalPlayer"]), 0),
+            "myTeam": my_team,
+            "theirTeam": their_team,
+        }
 
     def _normalize_champ_select(self) -> Dict[str, Any]:
         """Normalize champion select session, actions, teams, timer, and turn status."""
