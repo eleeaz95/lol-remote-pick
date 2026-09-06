@@ -1709,8 +1709,14 @@
       previewName.textContent = champ.name;
     } else {
       previewIcon.src = '';
+      // In card modes the champion is only random if you let the clock run out
+      const hasCards = benchMode && cs.bench.some((entry) => entry.isPriority);
       previewName.textContent = benchMode ? 'Waiting' : 'No champion';
-      previewSub.textContent = benchMode ? 'Your champion is assigned randomly' : 'Tap a champion above';
+      if (benchMode) {
+        previewSub.textContent = hasCards ? 'Tap one of your cards to take it' : 'Waiting for your champion';
+      } else {
+        previewSub.textContent = 'Tap a champion above';
+      }
     }
 
     if (!btnAction) return;
