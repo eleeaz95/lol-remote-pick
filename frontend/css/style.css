@@ -1084,24 +1084,33 @@ body.hextech-theme {
 }
 
 /* Turn Flasher Alert Banner */
+/* Loud enough to catch you mid-scroll, quiet enough to belong: the accent is carried by the
+   border and a breathing glow rather than a saturated slab, and it takes the colour the action
+   already means elsewhere - gold for your pick, red for your ban. */
 .cs-turn-banner {
+  --turn-accent: 200, 155, 60;
   margin-top: 6px;
-  background: linear-gradient(90deg, rgba(232, 64, 87, 0.9) 0%, rgba(200, 155, 60, 0.9) 100%);
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
+  padding: 7px 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  animation: flash-banner 1s infinite alternate;
+  border: 1px solid rgba(var(--turn-accent), 0.55);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, rgba(var(--turn-accent), 0.22) 0%, rgba(var(--turn-accent), 0.07) 100%);
+  animation: turn-call 1.6s ease-in-out infinite;
+}
+
+.cs-turn-banner.is-ban {
+  --turn-accent: 232, 64, 87;
 }
 
 .turn-flasher-text {
-  font-size: 13px;
-  font-weight: 900;
-  color: #ffffff;
-  letter-spacing: 1.5px;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--gold-light);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 /* Rosters & Teams Strips */
@@ -2111,12 +2120,13 @@ body.hextech-theme {
   }
 }
 
-@keyframes flash-banner {
-  from {
-    filter: brightness(0.9);
+@keyframes turn-call {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(var(--turn-accent), 0);
   }
-  to {
-    filter: brightness(1.3);
+  50% {
+    box-shadow: 0 0 16px rgba(var(--turn-accent), 0.45);
   }
 }
 

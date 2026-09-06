@@ -1392,6 +1392,7 @@
     if (turnBanner && turnText) {
       if (cs.isMyTurn && !benchMode) {
         turnBanner.classList.remove('hidden');
+        turnBanner.classList.toggle('is-ban', cs.actionPhase === 'BAN');
         turnText.textContent = cs.actionPhase === 'BAN' ? 'Your turn to ban' : 'Your turn to pick';
       } else {
         turnBanner.classList.add('hidden');
