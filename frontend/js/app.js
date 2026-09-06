@@ -37,9 +37,6 @@
       playerResponse: 'None', // 'None' | 'Accepted' | 'Declined'
       timer: 10,
       timerMax: 10,
-      numAccepted: 0,
-      numDeclined: 0,
-      totalPlayers: 10,
     },
     champSelect: {
       sessionActive: false,
@@ -843,9 +840,6 @@
         playerResponse: payload.readyCheck.playerResponse || 'None',
         timer: payload.readyCheck.timer !== undefined ? payload.readyCheck.timer : 10,
         timerMax: payload.readyCheck.timerMax || 10,
-        numAccepted: payload.readyCheck.numAccepted || 0,
-        numDeclined: payload.readyCheck.numDeclined || 0,
-        totalPlayers: payload.readyCheck.totalPlayers || 10,
       };
 
       if (state.phase === 'READY_CHECK' && state.readyCheck.state === 'InProgress') {
@@ -1283,28 +1277,6 @@
   // 4. Ready Check (Match Found) View
   function renderReadyCheckView() {
     updateReadyCheckTimerDisplay();
-
-    // Accepted count text
-    const acceptedCountText = document.getElementById('ready-accepted-count');
-    if (acceptedCountText) {
-      acceptedCountText.textContent = `${state.readyCheck.numAccepted} of ${state.readyCheck.totalPlayers} accepted`;
-    }
-
-    // Player status dots
-    const dotsContainer = document.getElementById('ready-player-dots');
-    if (dotsContainer) {
-      dotsContainer.innerHTML = '';
-      for (let i = 0; i < state.readyCheck.totalPlayers; i++) {
-        const dot = document.createElement('div');
-        dot.className = 'player-dot';
-        if (i < state.readyCheck.numAccepted) {
-          dot.classList.add('accepted');
-        } else if (i < state.readyCheck.numAccepted + state.readyCheck.numDeclined) {
-          dot.classList.add('declined');
-        }
-        dotsContainer.appendChild(dot);
-      }
-    }
 
     // Response state buttons
     const btnAccept = document.getElementById('btn-ready-accept');

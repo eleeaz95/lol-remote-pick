@@ -973,44 +973,6 @@ body.hextech-theme {
   color: var(--danger-red);
 }
 
-.ready-players-status {
-  margin-bottom: 24px;
-}
-
-.player-dots-grid {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.player-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1.5px solid var(--gold-border);
-  background: rgba(9, 20, 40, 0.8);
-  transition: all 0.25s ease;
-}
-
-.player-dot.accepted {
-  background: var(--emerald-green);
-  border-color: var(--emerald-green);
-  box-shadow: 0 0 8px var(--emerald-green);
-  transform: scale(1.15);
-}
-
-.player-dot.declined {
-  background: var(--danger-red);
-  border-color: var(--danger-red);
-}
-
-.accepted-count-text {
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--text-muted);
-}
-
 .ready-actions-container {
   display: flex;
   flex-direction: column;

@@ -302,9 +302,6 @@ class MockLCUServer:
         async def accept_ready_check():
             if self.ready_check:
                 self.ready_check["playerResponse"] = "Accepted"
-                self.ready_check["numAccepted"] = min(
-                    self.ready_check["totalPlayers"], self.ready_check["numAccepted"] + 1
-                )
                 await self.broadcast_event("/lol-matchmaking/v1/ready-check", self.ready_check)
             return Response(status_code=204)
 
@@ -525,10 +522,8 @@ class MockLCUServer:
             "playerResponse": "None",
             "timer": 10.0,
             "timerDuration": 10.0,
-            "numAccepted": 0,
-            "numDeclined": 0,
-            "totalPlayers": 10,
-            "maxPlayers": 10,
+            "declinerIds": [],
+            "dodgeWarning": "None",
         }
 
         await self.broadcast_event("/lol-gameflow/v1/gameflow-phase", "ReadyCheck")
@@ -909,12 +904,10 @@ class MockLCUServer:
                     await asyncio.sleep(1.0)
                     if self.ready_check and self.ready_check["state"] == "InProgress":
                         self.ready_check["timer"] = float(t)
-                        self.ready_check["numAccepted"] = min(10, self.ready_check["numAccepted"] + 2)
                         await self.broadcast_event("/lol-matchmaking/v1/ready-check", self.ready_check)
 
                 if self.ready_check:
                     self.ready_check["playerResponse"] = "Accepted"
-                    self.ready_check["numAccepted"] = 10
                     self.ready_check["state"] = "EveryoneReady"
                     await self.broadcast_event("/lol-matchmaking/v1/ready-check", self.ready_check)
                 await asyncio.sleep(1.5)

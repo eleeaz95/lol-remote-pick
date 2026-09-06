@@ -130,16 +130,13 @@ async def test_state_engine_phases_and_normalization():
             "playerResponse": "None",
             "timer": 9.2,
             "timerDuration": 10.0,
-            "numAccepted": 6,
-            "numDeclined": 0,
-            "maxPlayers": 10,
         },
     )
     state = engine.get_state()
     assert state["phase"] == "READY_CHECK"
     assert state["readyCheck"]["state"] == "InProgress"
     assert state["readyCheck"]["playerResponse"] == "None"
-    assert state["readyCheck"]["numAccepted"] == 6
+    assert state["readyCheck"]["timerMax"] == 10.0
 
     # Event: Champ Select
     await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")

@@ -611,18 +611,12 @@ class StateEngine:
                 "playerResponse": "None",
                 "timer": 0.0,
                 "timerMax": 10.0,
-                "numAccepted": 0,
-                "numDeclined": 0,
-                "totalPlayers": 10,
             }
 
         state = self._raw_ready_check.get("state", "None")
         response = self._raw_ready_check.get("playerResponse", "None")
         timer = float(self._raw_ready_check.get("timer", 0.0))
         timer_max = float(self._raw_ready_check.get("timerDuration", 10.0) or 10.0)
-        num_accepted = int(self._raw_ready_check.get("numAccepted", 0))
-        num_declined = int(self._raw_ready_check.get("numDeclined", 0))
-        total_players = int(self._raw_ready_check.get("maxPlayers", 10) or 10)
 
         # Some LCU versions provide playerResponse as boolean or Accepted/Declined string
         if response is True:
@@ -637,9 +631,6 @@ class StateEngine:
             "playerResponse": response,
             "timer": timer,
             "timerMax": timer_max,
-            "numAccepted": num_accepted,
-            "numDeclined": num_declined,
-            "totalPlayers": total_players,
         }
 
     def _detect_bench_mode(self, session: Dict[str, Any], bench: List[Dict[str, Any]]) -> bool:
