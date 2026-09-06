@@ -551,16 +551,6 @@ body.hextech-theme {
   padding-bottom: 90px;
 }
 
-.queue-badge {
-  background: rgba(10, 200, 185, 0.15);
-  border: 1px solid var(--hex-magic);
-  color: var(--hex-magic);
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-}
-
 .queue-selector-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));

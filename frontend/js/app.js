@@ -1157,11 +1157,6 @@
     // disabled but removed: nothing the player could do here would ever make it apply.
     toggleElementById('position-card', state.lobby.hasPositions !== false);
 
-    const queueBadge = document.getElementById('current-queue-badge');
-    if (queueBadge) {
-      queueBadge.textContent = state.lobby.queueName || 'Ranked Solo/Duo';
-    }
-
     // Queue button active state
     document.querySelectorAll('.queue-btn').forEach((btn) => {
       const qId = Number(btn.getAttribute('data-queue-id'));
@@ -2089,10 +2084,6 @@
 
       state.lobby.queueId = queueId;
       state.lobby.queueName = queueName;
-      const queueBadge = document.getElementById('current-queue-badge');
-      if (queueBadge) {
-        queueBadge.textContent = queueName;
-      }
 
       sendApiRequest('/api/lobby/create', { queueId });
     }
