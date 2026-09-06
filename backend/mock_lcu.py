@@ -350,6 +350,8 @@ class MockLCUServer:
                                 for m in self.champ_select.get("myTeam", []):
                                     if m.get("cellId") == act.get("actorCellId"):
                                         m["championId"] = champion_id
+                                if act.get("actorCellId") == self.champ_select.get("localPlayerCellId", 0):
+                                    self.champ_select.setdefault("mySelection", {})["selectedChampionId"] = champion_id
                         else:
                             # Hover / Pick intent
                             for m in self.champ_select.get("myTeam", []):
@@ -393,6 +395,8 @@ class MockLCUServer:
         async def bench_swap(champion_id: int):
             if not self.champ_select:
                 raise HTTPException(status_code=404, detail="No champ select session")
+            if self.champ_select.get("allowSubsetChampionPicks"):
+                raise HTTPException(status_code=400, detail="Claim one of your cards first")
             if not self.champ_select.get("benchEnabled"):
                 raise HTTPException(status_code=400, detail="Bench is not enabled for this queue")
 
@@ -681,20 +685,16 @@ class MockLCUServer:
         }
 
     def _build_bench_session(self) -> Dict[str, Any]:
-        """ARAM-style session: champions are pre-assigned, no bans, shared bench for swaps."""
+        """ARAM-style session, starting in the card subphase: the player is dealt a few champions
+        and must claim one by completing their pick action. The shared bench only opens afterwards.
+        """
         return {
             "localPlayerCellId": 0,
-            "benchEnabled": True,
+            # No bench yet - swapping is refused until a champion has been claimed
+            "benchEnabled": False,
             # The dealt cards are served by /subset-champion-list, not by this payload
             "allowSubsetChampionPicks": True,
-            # Own unchosen cards land on the bench flagged as priority
-            "benchChampions": [
-                {"championId": 22, "isPriority": True},
-                {"championId": 141, "isPriority": True},
-                {"championId": 51, "isPriority": False},
-                {"championId": 8, "isPriority": False},
-                {"championId": 89, "isPriority": False},
-            ],
+            "benchChampions": [],
             "timer": {
                 "phase": "BAN_PICK",
                 "adjustedTimeLeftInPhase": 45.0,
@@ -709,7 +709,7 @@ class MockLCUServer:
                     "cellId": 0,
                     "summonerName": self.summoner["displayName"],
                     "assignedPosition": "",
-                    "championId": 32,
+                    "championId": 0,
                     "spell1Id": 4,
                     "spell2Id": 32,
                 },
@@ -756,23 +756,59 @@ class MockLCUServer:
             "mySelection": {
                 "spell1Id": 4,
                 "spell2Id": 32,
-                "selectedChampionId": 32,
+                "selectedChampionId": 0,
             },
-            # ARAM assigns the pick automatically: the action exists but is already completed
+            # The pick action stays open until the player claims one of their cards
             "actions": [
                 [
                     {
                         "id": 1,
                         "actorCellId": 0,
-                        "championId": 32,
+                        "championId": 0,
                         "type": "pick",
-                        "completed": True,
-                        "isInProgress": False,
+                        "completed": False,
+                        "isInProgress": True,
                         "pickTurn": 1,
                     },
                 ]
             ],
         }
+
+    async def open_bench_pool(self) -> None:
+        """Close the card subphase: assign a champion if none was claimed, then open the bench."""
+        if not self.champ_select or not self.champ_select.get("allowSubsetChampionPicks"):
+            return
+
+        local_cell = self.champ_select.get("localPlayerCellId", 0)
+        claimed = 0
+        for m in self.champ_select.get("myTeam", []):
+            if m.get("cellId") == local_cell:
+                claimed = m.get("championId", 0) or 0
+                if not claimed:
+                    # Nobody picked in time, so the client hands out one of the cards
+                    claimed = self.subset_champion_ids[0] if self.subset_champion_ids else 32
+                    m["championId"] = claimed
+                break
+
+        self.champ_select["mySelection"]["selectedChampionId"] = claimed
+        for group in self.champ_select.get("actions", []):
+            for act in group:
+                if act.get("actorCellId") == local_cell and act.get("type") == "pick":
+                    act["championId"] = claimed
+                    act["completed"] = True
+                    act["isInProgress"] = False
+
+        self.champ_select["allowSubsetChampionPicks"] = False
+        self.champ_select["benchEnabled"] = True
+        # The cards nobody claimed roll into the shared bench alongside the rest of the pool
+        leftovers = [cid for cid in self.subset_champion_ids if cid != claimed]
+        self.champ_select["benchChampions"] = [{"championId": cid, "isPriority": True} for cid in leftovers] + [
+            {"championId": 51, "isPriority": False},
+            {"championId": 8, "isPriority": False},
+            {"championId": 89, "isPriority": False},
+        ]
+
+        await self.broadcast_event("/lol-champ-select/v1/session", self.champ_select)
 
     async def advance_to_pick_phase(self) -> None:
         """Advance mock champ select from ban phase to pick phase."""

@@ -735,7 +735,11 @@ class AppHub:
                 elif cur_phase == "ReadyCheck":
                     await self.mock_server.trigger_champ_select()
                 elif cur_phase == "ChampSelect":
-                    await self.mock_server.trigger_in_game()
+                    if (self.mock_server.champ_select or {}).get("allowSubsetChampionPicks"):
+                        # Card subphase: close the cards and open the shared bench first
+                        await self.mock_server.open_bench_pool()
+                    else:
+                        await self.mock_server.trigger_in_game()
                 elif cur_phase == "InProgress":
                     await self.mock_server.trigger_lobby(420)
                 await asyncio.sleep(0.05)

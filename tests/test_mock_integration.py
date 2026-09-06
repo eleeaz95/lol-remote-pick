@@ -306,6 +306,7 @@ async def test_aram_champ_select_bench_swap(mock_app_and_client):
 
     await hub.mock_server.trigger_lobby(queue_id=450)
     await hub.mock_server.trigger_champ_select(queue_id=450)
+    await hub.mock_server.open_bench_pool()
     await asyncio.sleep(0.05)
 
     state = (await client.get("/api/state")).json()
@@ -356,17 +357,24 @@ async def test_aram_mayhem_lobby_and_champ_select(mock_app_and_client):
     assert state_lobby["lobby"]["queueId"] == 2400
     assert "Mayhem" in state_lobby["lobby"]["queueName"]
 
-    # Enter Champ Select
+    # Enter Champ Select, which opens on the card subphase
     await hub.mock_server.trigger_champ_select(queue_id=2400)
-    await asyncio.sleep(0.05)
+    cs = await _wait_for_dealt_cards(client)
 
-    state_cs = (await client.get("/api/state")).json()
-    cs = state_cs["champSelect"]
     assert cs["pickMode"] == "BENCH"
     assert cs["benchEnabled"] is True
-    assert len(cs["bench"]) > 0
-    assert cs["isMyTurn"] is False
+    assert cs["localPickCompleted"] is False
+    assert cs["myTeam"][0]["championId"] == 0, "no champion is assigned until a card is claimed"
     assert cs["bans"]["myTeamBans"] == []
+
+    # Once the cards close, the shared pool takes over
+    await hub.mock_server.open_bench_pool()
+    await asyncio.sleep(0.05)
+
+    cs_pool = (await client.get("/api/state")).json()["champSelect"]
+    assert cs_pool["localPickCompleted"] is True
+    assert cs_pool["myTeam"][0]["championId"] > 0
+    assert len(cs_pool["bench"]) > 0
 
 
 async def _wait_for_dealt_cards(client, timeout: float = 2.0) -> dict:
@@ -380,6 +388,31 @@ async def _wait_for_dealt_cards(client, timeout: float = 2.0) -> dict:
         if any(entry["isPriority"] for entry in cs["bench"]):
             return cs
     return cs
+
+
+@pytest.mark.asyncio
+async def test_card_selection_pick_claims_the_card(mock_app_and_client):
+    """Tapping a dealt card must claim it, which the bench swap endpoint cannot do yet."""
+    app, client, hub = mock_app_and_client
+
+    await hub.mock_server.trigger_lobby(queue_id=2400)
+    await hub.mock_server.trigger_champ_select(queue_id=2400)
+    cs = await _wait_for_dealt_cards(client)
+
+    card = hub.mock_server.subset_champion_ids[0]
+    assert card in [entry["championId"] for entry in cs["bench"]]
+
+    res = await client.post("/api/champ-select/bench-swap", json={"championId": card})
+    assert res.status_code == 200
+    assert res.json()["success"] is True
+    await asyncio.sleep(0.05)
+
+    cs2 = (await client.get("/api/state")).json()["champSelect"]
+    me = next(m for m in cs2["myTeam"] if m["isLocalPlayer"])
+    assert me["championId"] == card
+    assert cs2["mySelection"]["selectedChampionId"] == card
+    assert cs2["localPickCompleted"] is True
+    assert card not in [entry["championId"] for entry in cs2["bench"]], "own champion is not swappable"
 
 
 @pytest.mark.asyncio
