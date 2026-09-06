@@ -1,15 +1,16 @@
 """Comprehensive tests for backend core modules: connector, client, ws, state engine, and mock LCU."""
 
 import asyncio
-import pytest
 from pathlib import Path
 
+import pytest
+
 from backend.config import Settings, get_settings
-from backend.lcu_connector import LCUCredentials, LCUConnector
 from backend.lcu_client import LCUClient
+from backend.lcu_connector import LCUConnector, LCUCredentials
 from backend.lcu_ws import LCUWebSocket
-from backend.state_engine import StateEngine
 from backend.mock_lcu import MockLCUServer
+from backend.state_engine import StateEngine
 
 
 @pytest.mark.asyncio
@@ -64,33 +65,39 @@ async def test_state_engine_phases_and_normalization():
     assert state["phase"] == "NONE"
 
     # Event: Summoner
-    await engine.handle_lcu_event("/lol-summoner/v1/current-summoner", {
-        "displayName": "Faker",
-        "summonerId": 123456,
-        "profileIconId": 6,
-        "summonerLevel": 500,
-        "tagLine": "T1",
-    })
+    await engine.handle_lcu_event(
+        "/lol-summoner/v1/current-summoner",
+        {
+            "displayName": "Faker",
+            "summonerId": 123456,
+            "profileIconId": 6,
+            "summonerLevel": 500,
+            "tagLine": "T1",
+        },
+    )
     state = engine.get_state()
     assert state["summoner"]["displayName"] == "Faker#T1"
     assert state["summoner"]["summonerLevel"] == 500
 
     # Event: Lobby creation
     await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "Lobby")
-    await engine.handle_lcu_event("/lol-lobby/v2/lobby", {
-        "gameConfig": {"queueId": 420},
-        "canStartActivity": True,
-        "members": [
-            {
-                "summonerId": 123456,
-                "summonerName": "Faker",
-                "isLeader": True,
-                "isLocalMember": True,
-                "firstPositionPreference": "MIDDLE",
-                "secondPositionPreference": "FILL",
-            }
-        ]
-    })
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/lobby",
+        {
+            "gameConfig": {"queueId": 420},
+            "canStartActivity": True,
+            "members": [
+                {
+                    "summonerId": 123456,
+                    "summonerName": "Faker",
+                    "isLeader": True,
+                    "isLocalMember": True,
+                    "firstPositionPreference": "MIDDLE",
+                    "secondPositionPreference": "FILL",
+                }
+            ],
+        },
+    )
     state = engine.get_state()
     assert state["phase"] == "LOBBY"
     assert state["lobby"]["queueId"] == 420
@@ -101,11 +108,14 @@ async def test_state_engine_phases_and_normalization():
 
     # Event: Matchmaking search
     await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "Matchmaking")
-    await engine.handle_lcu_event("/lol-matchmaking/v1/search", {
-        "searchState": "Searching",
-        "timeInQueue": 14.5,
-        "estimatedQueueTime": 45.0,
-    })
+    await engine.handle_lcu_event(
+        "/lol-matchmaking/v1/search",
+        {
+            "searchState": "Searching",
+            "timeInQueue": 14.5,
+            "estimatedQueueTime": 45.0,
+        },
+    )
     state = engine.get_state()
     assert state["phase"] == "IN_QUEUE"
     assert state["queue"]["inQueue"] is True
@@ -113,15 +123,18 @@ async def test_state_engine_phases_and_normalization():
 
     # Event: Ready Check
     await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ReadyCheck")
-    await engine.handle_lcu_event("/lol-matchmaking/v1/ready-check", {
-        "state": "InProgress",
-        "playerResponse": "None",
-        "timer": 9.2,
-        "timerDuration": 10.0,
-        "numAccepted": 6,
-        "numDeclined": 0,
-        "maxPlayers": 10,
-    })
+    await engine.handle_lcu_event(
+        "/lol-matchmaking/v1/ready-check",
+        {
+            "state": "InProgress",
+            "playerResponse": "None",
+            "timer": 9.2,
+            "timerDuration": 10.0,
+            "numAccepted": 6,
+            "numDeclined": 0,
+            "maxPlayers": 10,
+        },
+    )
     state = engine.get_state()
     assert state["phase"] == "READY_CHECK"
     assert state["readyCheck"]["state"] == "InProgress"
@@ -130,38 +143,69 @@ async def test_state_engine_phases_and_normalization():
 
     # Event: Champ Select
     await engine.handle_lcu_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
-    await engine.handle_lcu_event("/lol-champ-select/v1/session", {
-        "localPlayerCellId": 0,
-        "timer": {
-            "phase": "BAN_PICK",
-            "adjustedTimeLeftInPhase": 22000,
-            "totalTimeInPhase": 30000,
-        },
-        "bans": {
-            "myTeamBans": [84],
-            "theirTeamBans": [238],
-        },
-        "myTeam": [
-            {"cellId": 0, "summonerName": "Faker", "assignedPosition": "middle", "championId": 0, "spell1Id": 4, "spell2Id": 14},
-            {"cellId": 1, "summonerName": "Oner", "assignedPosition": "jungle", "championId": 64, "spell1Id": 4, "spell2Id": 11},
-        ],
-        "theirTeam": [
-            {"cellId": 5, "assignedPosition": "middle", "championId": 0},
-        ],
-        "mySelection": {
-            "spell1Id": 4,
-            "spell2Id": 14,
-            "selectedChampionId": 0,
-        },
-        "actions": [
-            [
-                {"id": 1, "actorCellId": 0, "championId": 0, "type": "ban", "completed": False, "isInProgress": True},
+    await engine.handle_lcu_event(
+        "/lol-champ-select/v1/session",
+        {
+            "localPlayerCellId": 0,
+            "timer": {
+                "phase": "BAN_PICK",
+                "adjustedTimeLeftInPhase": 22000,
+                "totalTimeInPhase": 30000,
+            },
+            "bans": {
+                "myTeamBans": [84],
+                "theirTeamBans": [238],
+            },
+            "myTeam": [
+                {
+                    "cellId": 0,
+                    "summonerName": "Faker",
+                    "assignedPosition": "middle",
+                    "championId": 0,
+                    "spell1Id": 4,
+                    "spell2Id": 14,
+                },
+                {
+                    "cellId": 1,
+                    "summonerName": "Oner",
+                    "assignedPosition": "jungle",
+                    "championId": 64,
+                    "spell1Id": 4,
+                    "spell2Id": 11,
+                },
             ],
-            [
-                {"id": 6, "actorCellId": 0, "championId": 0, "type": "pick", "completed": False, "isInProgress": False},
-            ]
-        ]
-    })
+            "theirTeam": [
+                {"cellId": 5, "assignedPosition": "middle", "championId": 0},
+            ],
+            "mySelection": {
+                "spell1Id": 4,
+                "spell2Id": 14,
+                "selectedChampionId": 0,
+            },
+            "actions": [
+                [
+                    {
+                        "id": 1,
+                        "actorCellId": 0,
+                        "championId": 0,
+                        "type": "ban",
+                        "completed": False,
+                        "isInProgress": True,
+                    },
+                ],
+                [
+                    {
+                        "id": 6,
+                        "actorCellId": 0,
+                        "championId": 0,
+                        "type": "pick",
+                        "completed": False,
+                        "isInProgress": False,
+                    },
+                ],
+            ],
+        },
+    )
     state = engine.get_state()
     assert state["phase"] == "CHAMP_SELECT"
     assert state["champSelect"]["sessionActive"] is True
@@ -201,9 +245,7 @@ async def test_mock_lcu_server_integration():
         await engine.handle_lcu_event(uri, data, event_type)
 
     ws_client = LCUWebSocket(
-        credentials=creds,
-        event_callback=on_ws_event,
-        connection_callback=lambda conn: engine.set_connected(conn)
+        credentials=creds, event_callback=on_ws_event, connection_callback=lambda conn: engine.set_connected(conn)
     )
 
     try:
@@ -290,6 +332,7 @@ async def test_mock_lcu_server_integration():
 async def test_lcu_connector_caching_and_is_alive(tmp_path: Path):
     """Verify LCUConnector credential caching, is_alive check, and stat caching."""
     import os
+
     lockfile = tmp_path / "lockfile"
     current_pid = os.getpid()
     lockfile.write_text(f"LeagueClientUx:{current_pid}:55555:testpassword:https", encoding="utf-8")
@@ -354,11 +397,13 @@ async def test_lcu_ws_connection_debouncing():
     await asyncio.sleep(0.05)
     assert False in conn_changes
 
+
 @pytest.mark.asyncio
 async def test_app_hub_broadcast_deduplication():
     """Verify AppHub.broadcast_state skips sending when state payload is materially unchanged."""
-    from backend.server import AppHub
     from unittest.mock import AsyncMock
+
+    from backend.server import AppHub
 
     settings = Settings(mock_mode=False)
     hub = AppHub(settings)
@@ -386,8 +431,9 @@ async def test_app_hub_broadcast_deduplication():
 @pytest.mark.asyncio
 async def test_server_poll_loop_skips_http_when_ws_connected():
     """Verify _lcu_poll_loop skips REST HTTP polling calls when LCU WebSocket is connected."""
-    from backend.server import AppHub
     from unittest.mock import AsyncMock, MagicMock
+
+    from backend.server import AppHub
 
     settings = Settings(mock_mode=False, lcu_poll_interval=0.05)
     hub = AppHub(settings)
@@ -464,7 +510,7 @@ async def test_lcu_connector_riot_metadata_discovery(tmp_path: Path, monkeypatch
 @pytest.mark.asyncio
 async def test_network_ip_detection_and_qr():
     """Verify get_all_lan_ips, get_best_lan_ip, and generate_svg_qr."""
-    from backend.server import get_all_lan_ips, get_best_lan_ip, generate_svg_qr
+    from backend.server import generate_svg_qr, get_all_lan_ips, get_best_lan_ip
 
     all_ips = get_all_lan_ips()
     assert isinstance(all_ips, list)
@@ -487,7 +533,8 @@ async def test_network_ip_detection_and_qr():
 @pytest.mark.asyncio
 async def test_network_info_endpoint():
     """Verify /api/network-info endpoint response."""
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from backend.server import create_app
 
     app = create_app(Settings(mock_mode=True))
@@ -511,6 +558,7 @@ async def test_frozen_path_resolution(tmp_path: Path, monkeypatch):
     (fake_frontend / "index.html").write_text("<html></html>", encoding="utf-8")
 
     import sys
+
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "_MEIPASS", str(fake_meipass), raising=False)
 
@@ -523,7 +571,8 @@ async def test_frozen_path_resolution(tmp_path: Path, monkeypatch):
 @pytest.mark.asyncio
 async def test_security_path_traversal_blocked(tmp_path: Path):
     """Verify that catch-all static route blocks path traversal attempts outside static_dir."""
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from backend.server import create_app
 
     fake_static = tmp_path / "frontend"
@@ -554,7 +603,8 @@ async def test_security_path_traversal_blocked(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_security_cors_policy():
     """Verify CORS policy is secure and does not allow wildcard credentials."""
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from backend.server import create_app
 
     # 1. Wildcard origin -> credentials disabled
@@ -562,7 +612,6 @@ async def test_security_cors_policy():
     transport = ASGITransport(app=app_wildcard)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.options(
-            "/api/state",
-            headers={"Origin": "https://malicious-site.com", "Access-Control-Request-Method": "GET"}
+            "/api/state", headers={"Origin": "https://malicious-site.com", "Access-Control-Request-Method": "GET"}
         )
         assert resp.headers.get("access-control-allow-credentials") != "true"

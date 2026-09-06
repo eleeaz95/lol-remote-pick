@@ -26,6 +26,9 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# Node (dev-only frontend formatting tooling)
+node_modules/
+
 # Environment Variables & Local Configs
 .env
 .env.local

@@ -16,20 +16,20 @@
     summoner: {
       displayName: '',
       profileIconId: 0,
-      summonerLevel: 1
+      summonerLevel: 1,
     },
     lobby: {
       queueId: 420,
       queueName: 'Ranked Solo/Duo',
       isLeader: true,
       canStartQueue: true,
-      members: []
+      members: [],
     },
     queue: {
       inQueue: false,
       timeInQueue: 0,
       estimatedTime: 90,
-      queueId: 420
+      queueId: 420,
     },
     readyCheck: {
       state: 'None', // 'InProgress' | 'EveryoneReady' | 'StrangerNotReady' | 'None'
@@ -38,7 +38,7 @@
       timerMax: 10,
       numAccepted: 0,
       numDeclined: 0,
-      totalPlayers: 10
+      totalPlayers: 10,
     },
     champSelect: {
       sessionActive: false,
@@ -49,23 +49,23 @@
       timer: {
         phase: 'NONE',
         adjustedTimeLeftInPhase: 30,
-        totalTimeInPhase: 30
+        totalTimeInPhase: 30,
       },
       bans: {
         myTeamBans: [],
-        theirTeamBans: []
+        theirTeamBans: [],
       },
       myTeam: [],
       theirTeam: [],
       mySelection: {
         spell1Id: 4, // Flash
         spell2Id: 14, // Ignite
-        selectedChampionId: 0
+        selectedChampionId: 0,
       },
       pickMode: 'DRAFT', // 'DRAFT' | 'BENCH' (ARAM-like: random champs + shared bench)
       benchEnabled: false,
-      bench: [] // [{ championId, isPriority }]
-    }
+      bench: [], // [{ championId, isPriority }]
+    },
   };
 
   // Local UI State
@@ -105,29 +105,92 @@
     lastReadyCheckState: null,
     lastReadyCheckDisplayedSec: -1,
     queueStartMs: 0,
-    lastQueueDisplayedSec: -1
+    lastQueueDisplayedSec: -1,
   };
   // Default Fallback Catalogs
   const DEFAULT_SPELLS = [
-    { id: 4, name: 'Flash', key: 'SummonerFlash', cooldown: 300, iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerFlash.png', desc: 'Teleports your champion a short distance.' },
-    { id: 14, name: 'Ignite', key: 'SummonerDot', cooldown: 180, iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerDot.png', desc: 'Ignites target enemy champion dealing true damage.' },
-    { id: 12, name: 'Teleport', key: 'SummonerTeleport', cooldown: 360, iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerTeleport.png', desc: 'Channels to teleport to an allied structure/unit.' },
-    { id: 11, name: 'Smite', key: 'SummonerSmite', cooldown: 90, iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerSmite.png', desc: 'Deals true damage to monsters and minions.' },
-    { id: 7, name: 'Heal', key: 'SummonerHeal', cooldown: 240, iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerHeal.png', desc: 'Restores health and grants movement speed to you and target ally.' },
-    { id: 21, name: 'Barrier', key: 'SummonerBarrier', cooldown: 180, iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerBarrier.png', desc: 'Shields your champion from damage.' },
-    { id: 3, name: 'Exhaust', key: 'SummonerExhaust', cooldown: 210, iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerExhaust.png', desc: 'Exhausts target enemy champion, reducing damage and speed.' },
-    { id: 1, name: 'Cleanse', key: 'SummonerBoost', cooldown: 210, iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerBoost.png', desc: 'Removes disables and debuffs.' },
-    { id: 6, name: 'Ghost', key: 'SummonerHaste', cooldown: 210, iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerHaste.png', desc: 'Grants burst of movement speed and ghosting.' }
+    {
+      id: 4,
+      name: 'Flash',
+      key: 'SummonerFlash',
+      cooldown: 300,
+      iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerFlash.png',
+      desc: 'Teleports your champion a short distance.',
+    },
+    {
+      id: 14,
+      name: 'Ignite',
+      key: 'SummonerDot',
+      cooldown: 180,
+      iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerDot.png',
+      desc: 'Ignites target enemy champion dealing true damage.',
+    },
+    {
+      id: 12,
+      name: 'Teleport',
+      key: 'SummonerTeleport',
+      cooldown: 360,
+      iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerTeleport.png',
+      desc: 'Channels to teleport to an allied structure/unit.',
+    },
+    {
+      id: 11,
+      name: 'Smite',
+      key: 'SummonerSmite',
+      cooldown: 90,
+      iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerSmite.png',
+      desc: 'Deals true damage to monsters and minions.',
+    },
+    {
+      id: 7,
+      name: 'Heal',
+      key: 'SummonerHeal',
+      cooldown: 240,
+      iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerHeal.png',
+      desc: 'Restores health and grants movement speed to you and target ally.',
+    },
+    {
+      id: 21,
+      name: 'Barrier',
+      key: 'SummonerBarrier',
+      cooldown: 180,
+      iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerBarrier.png',
+      desc: 'Shields your champion from damage.',
+    },
+    {
+      id: 3,
+      name: 'Exhaust',
+      key: 'SummonerExhaust',
+      cooldown: 210,
+      iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerExhaust.png',
+      desc: 'Exhausts target enemy champion, reducing damage and speed.',
+    },
+    {
+      id: 1,
+      name: 'Cleanse',
+      key: 'SummonerBoost',
+      cooldown: 210,
+      iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerBoost.png',
+      desc: 'Removes disables and debuffs.',
+    },
+    {
+      id: 6,
+      name: 'Ghost',
+      key: 'SummonerHaste',
+      cooldown: 210,
+      iconUrl: 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/spell/SummonerHaste.png',
+      desc: 'Grants burst of movement speed and ghosting.',
+    },
   ];
 
   const POPULAR_CHAMPIONS_FALLBACK = [
     { id: 103, key: 'Ahri', name: 'Ahri', roles: ['MIDDLE', 'MAGE', 'ASSASSIN'] },
     { id: 84, key: 'Akali', name: 'Akali', roles: ['MIDDLE', 'TOP', 'ASSASSIN'] },
     { id: 12, key: 'Alistar', name: 'Alistar', roles: ['UTILITY', 'TANK'] },
-    {"id": 799, "key": "Ambessa", "name": "Ambessa", "roles": ["TOP", "FIGHTER"]},
-    {"id": 893, "key": "Aurora", "name": "Aurora", "roles": ["MIDDLE", "TOP", "MAGE"]},
-    {"id": 200, "key": "Belveth", "name": "Bel'Veth", "roles": ["JUNGLE", "FIGHTER"]},
-    {"id": 233, "key": "Briar", "name": "Briar", "roles": ["JUNGLE", "FIGHTER"]},
+    { id: 799, key: 'Ambessa', name: 'Ambessa', roles: ['TOP', 'FIGHTER'] },
+    { id: 893, key: 'Aurora', name: 'Aurora', roles: ['MIDDLE', 'TOP', 'MAGE'] },
+    { id: 200, key: 'Belveth', name: "Bel'Veth", roles: ['JUNGLE', 'FIGHTER'] },
+    { id: 233, key: 'Briar', name: 'Briar', roles: ['JUNGLE', 'FIGHTER'] },
     { id: 32, key: 'Amumu', name: 'Amumu', roles: ['JUNGLE', 'TANK'] },
     { id: 1, key: 'Annie', name: 'Annie', roles: ['MIDDLE', 'MAGE'] },
     { id: 22, key: 'Ashe', name: 'Ashe', roles: ['BOTTOM', 'MARKSMAN', 'UTILITY'] },
@@ -146,27 +209,27 @@
     { id: 86, key: 'Garen', name: 'Garen', roles: ['TOP', 'FIGHTER', 'TANK'] },
     { id: 104, key: 'Graves', name: 'Graves', roles: ['JUNGLE', 'MARKSMAN'] },
     { id: 39, key: 'Irelia', name: 'Irelia', roles: ['TOP', 'MIDDLE', 'FIGHTER'] },
-    {"id": 910, "key": "Hwei", "name": "Hwei", "roles": ["MIDDLE", "SUPPORT", "MAGE"]},
+    { id: 910, key: 'Hwei', name: 'Hwei', roles: ['MIDDLE', 'SUPPORT', 'MAGE'] },
     { id: 40, key: 'Janna', name: 'Janna', roles: ['UTILITY', 'SUPPORT'] },
     { id: 24, key: 'Jax', name: 'Jax', roles: ['TOP', 'JUNGLE', 'FIGHTER'] },
     { id: 202, key: 'Jhin', name: 'Jhin', roles: ['BOTTOM', 'MARKSMAN'] },
     { id: 222, key: 'Jinx', name: 'Jinx', roles: ['BOTTOM', 'MARKSMAN'] },
-    { id: 145, key: 'Kaisa', name: 'Kai\'Sa', roles: ['BOTTOM', 'MARKSMAN'] },
+    { id: 145, key: 'Kaisa', name: "Kai'Sa", roles: ['BOTTOM', 'MARKSMAN'] },
     { id: 38, key: 'Kassadin', name: 'Kassadin', roles: ['MIDDLE', 'ASSASSIN'] },
     { id: 55, key: 'Katarina', name: 'Katarina', roles: ['MIDDLE', 'ASSASSIN'] },
     { id: 85, key: 'Kennen', name: 'Kennen', roles: ['TOP', 'MAGE'] },
-    {"id": 897, "key": "KSante", "name": "K'Sante", "roles": ["TOP", "TANK"]},
-    { id: 121, key: 'Khazix', name: 'Kha\'Zix', roles: ['JUNGLE', 'ASSASSIN'] },
+    { id: 897, key: 'KSante', name: "K'Sante", roles: ['TOP', 'TANK'] },
+    { id: 121, key: 'Khazix', name: "Kha'Zix", roles: ['JUNGLE', 'ASSASSIN'] },
     { id: 64, key: 'LeeSin', name: 'Lee Sin', roles: ['JUNGLE', 'FIGHTER'] },
     { id: 89, key: 'Leona', name: 'Leona', roles: ['UTILITY', 'TANK'] },
     { id: 99, key: 'Lux', name: 'Lux', roles: ['MIDDLE', 'UTILITY', 'MAGE'] },
     { id: 11, key: 'MasterYi', name: 'Master Yi', roles: ['JUNGLE', 'ASSASSIN'] },
     { id: 21, key: 'MissFortune', name: 'Miss Fortune', roles: ['BOTTOM', 'MARKSMAN'] },
     { id: 25, key: 'Morgana', name: 'Morgana', roles: ['UTILITY', 'MIDDLE', 'MAGE'] },
-    {"id": 800, "key": "Mel", "name": "Mel", "roles": ["MIDDLE", "UTILITY", "MAGE"]},
-    {"id": 902, "key": "Milio", "name": "Milio", "roles": ["UTILITY", "SUPPORT"]},
-    {"id": 950, "key": "Naafiri", "name": "Naafiri", "roles": ["MIDDLE", "ASSASSIN"]},
-    {"id": 895, "key": "Nilah", "name": "Nilah", "roles": ["BOTTOM", "FIGHTER"]},
+    { id: 800, key: 'Mel', name: 'Mel', roles: ['MIDDLE', 'UTILITY', 'MAGE'] },
+    { id: 902, key: 'Milio', name: 'Milio', roles: ['UTILITY', 'SUPPORT'] },
+    { id: 950, key: 'Naafiri', name: 'Naafiri', roles: ['MIDDLE', 'ASSASSIN'] },
+    { id: 895, key: 'Nilah', name: 'Nilah', roles: ['BOTTOM', 'FIGHTER'] },
     { id: 267, key: 'Nami', name: 'Nami', roles: ['UTILITY', 'SUPPORT'] },
     { id: 75, key: 'Nasus', name: 'Nasus', roles: ['TOP', 'FIGHTER', 'TANK'] },
     { id: 111, key: 'Nautilus', name: 'Nautilus', roles: ['UTILITY', 'TANK'] },
@@ -180,9 +243,9 @@
     { id: 875, key: 'Sett', name: 'Sett', roles: ['TOP', 'FIGHTER'] },
     { id: 98, key: 'Shen', name: 'Shen', roles: ['TOP', 'UTILITY', 'TANK'] },
     { id: 37, key: 'Sona', name: 'Sona', roles: ['UTILITY', 'SUPPORT'] },
-    {"id": 888, "key": "Renata", "name": "Renata Glasc", "roles": ["UTILITY", "SUPPORT"]},
+    { id: 888, key: 'Renata', name: 'Renata Glasc', roles: ['UTILITY', 'SUPPORT'] },
     { id: 16, key: 'Soraka', name: 'Soraka', roles: ['UTILITY', 'SUPPORT'] },
-    {"id": 901, "key": "Smolder", "name": "Smolder", "roles": ["BOTTOM", "MARKSMAN"]},
+    { id: 901, key: 'Smolder', name: 'Smolder', roles: ['BOTTOM', 'MARKSMAN'] },
     { id: 134, key: 'Syndra', name: 'Syndra', roles: ['MIDDLE', 'MAGE'] },
     { id: 91, key: 'Talon', name: 'Talon', roles: ['MIDDLE', 'JUNGLE', 'ASSASSIN'] },
     { id: 412, key: 'Thresh', name: 'Thresh', roles: ['UTILITY', 'SUPPORT'] },
@@ -199,12 +262,12 @@
     { id: 498, key: 'Xayah', name: 'Xayah', roles: ['BOTTOM', 'MARKSMAN'] },
     { id: 157, key: 'Yasuo', name: 'Yasuo', roles: ['MIDDLE', 'TOP', 'BOTTOM', 'FIGHTER'] },
     { id: 777, key: 'Yone', name: 'Yone', roles: ['MIDDLE', 'TOP', 'ASSASSIN'] },
-    {"id": 804, "key": "Yunara", "name": "Yunara", "roles": ["BOTTOM", "MARKSMAN"]},
+    { id: 804, key: 'Yunara', name: 'Yunara', roles: ['BOTTOM', 'MARKSMAN'] },
     { id: 350, key: 'Yuumi', name: 'Yuumi', roles: ['UTILITY', 'SUPPORT'] },
     { id: 154, key: 'Zac', name: 'Zac', roles: ['JUNGLE', 'TOP', 'TANK'] },
     { id: 238, key: 'Zed', name: 'Zed', roles: ['MIDDLE', 'ASSASSIN'] },
     { id: 142, key: 'Zoe', name: 'Zoe', roles: ['MIDDLE', 'MAGE'] },
-    { id: 143, key: 'Zyra', name: 'Zyra', roles: ['UTILITY', 'MIDDLE', 'MAGE'] }
+    { id: 143, key: 'Zyra', name: 'Zyra', roles: ['UTILITY', 'MIDDLE', 'MAGE'] },
   ];
 
   // =========================================================================
@@ -232,14 +295,14 @@
       const now = audioCtx.currentTime;
 
       // Harmonic Minor / Gong frequencies: D3, A3, D4, F4, A4
-      const frequencies = [146.83, 220.00, 293.66, 349.23, 440.00];
+      const frequencies = [146.83, 220.0, 293.66, 349.23, 440.0];
 
       frequencies.forEach((freq, index) => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         const filter = audioCtx.createBiquadFilter();
 
-        osc.type = index === 0 ? 'sine' : (index % 2 === 0 ? 'triangle' : 'sawtooth');
+        osc.type = index === 0 ? 'sine' : index % 2 === 0 ? 'triangle' : 'sawtooth';
         osc.frequency.setValueAtTime(freq, now);
 
         filter.type = 'lowpass';
@@ -267,7 +330,7 @@
     if (!localState.soundEnabled || !audioCtx) return;
     try {
       const now = audioCtx.currentTime;
-      const notes = [587.33, 880.00, 1174.66]; // D5, A5, D6
+      const notes = [587.33, 880.0, 1174.66]; // D5, A5, D6
 
       notes.forEach((freq, i) => {
         const noteStart = now + i * 0.12;
@@ -430,7 +493,11 @@
   }
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && state.connected && (state.phase === 'IN_QUEUE' || state.phase === 'CHAMP_SELECT' || state.phase === 'READY_CHECK')) {
+    if (
+      document.visibilityState === 'visible' &&
+      state.connected &&
+      (state.phase === 'IN_QUEUE' || state.phase === 'CHAMP_SELECT' || state.phase === 'READY_CHECK')
+    ) {
       requestWakeLock();
     }
   });
@@ -496,20 +563,20 @@
     }
 
     localState.spellsMap.clear();
-    localState.spells.forEach(s => localState.spellsMap.set(Number(s.id), s));
+    localState.spells.forEach((s) => localState.spellsMap.set(Number(s.id), s));
 
     // 2. Champions
     try {
       const res = await fetch('/api/champions');
       if (res.ok) {
         const data = await res.json();
-        const champList = Array.isArray(data) ? data : (data.champions || POPULAR_CHAMPIONS_FALLBACK);
-        localState.champions = champList.map(c => ({
+        const champList = Array.isArray(data) ? data : data.champions || POPULAR_CHAMPIONS_FALLBACK;
+        localState.champions = champList.map((c) => ({
           id: Number(c.id),
           key: c.key || c.name || String(c.id),
           name: c.name || c.key || 'Champion',
           icon: c.icon || getChampionIconUrl(c.key || c.name, c.id),
-          roles: Array.isArray(c.roles) ? c.roles.map(r => r.toUpperCase()) : ['MIDDLE']
+          roles: Array.isArray(c.roles) ? c.roles.map((r) => r.toUpperCase()) : ['MIDDLE'],
         }));
       } else {
         localState.champions = POPULAR_CHAMPIONS_FALLBACK;
@@ -521,7 +588,7 @@
     // Sort champions alphabetically
     localState.champions.sort((a, b) => a.name.localeCompare(b.name));
     localState.championsMap.clear();
-    localState.champions.forEach(c => localState.championsMap.set(c.id, c));
+    localState.champions.forEach((c) => localState.championsMap.set(c.id, c));
 
     // Render champion grid & spell modal
     renderChampionsGrid();
@@ -537,7 +604,9 @@
 
   function connectWebSocket() {
     if (localState.ws) {
-      try { localState.ws.close(); } catch (e) {}
+      try {
+        localState.ws.close();
+      } catch (e) {}
       localState.ws = null;
     }
 
@@ -622,7 +691,7 @@
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -658,7 +727,7 @@
     }
 
     // Direct state payload or wrapped
-    const payload = data.type === 'state' ? data.payload : (data.state || data);
+    const payload = data.type === 'state' ? data.payload : data.state || data;
 
     // Merge connection flags
     state.connected = payload.connected !== undefined ? Boolean(payload.connected) : state.connected;
@@ -666,7 +735,15 @@
 
     // Phase normalization (keep the current phase if the payload omits one)
     let nextPhase = (payload.phase || state.phase || 'DISCONNECTED').toUpperCase();
-    if (!state.connected && nextPhase !== 'NONE' && nextPhase !== 'LOBBY' && nextPhase !== 'IN_QUEUE' && nextPhase !== 'READY_CHECK' && nextPhase !== 'CHAMP_SELECT' && nextPhase !== 'IN_GAME') {
+    if (
+      !state.connected &&
+      nextPhase !== 'NONE' &&
+      nextPhase !== 'LOBBY' &&
+      nextPhase !== 'IN_QUEUE' &&
+      nextPhase !== 'READY_CHECK' &&
+      nextPhase !== 'CHAMP_SELECT' &&
+      nextPhase !== 'IN_GAME'
+    ) {
       nextPhase = 'DISCONNECTED';
     }
     state.phase = nextPhase;
@@ -676,7 +753,7 @@
       state.summoner = {
         displayName: payload.summoner.displayName || payload.summoner.gameName || 'Summoner',
         profileIconId: payload.summoner.profileIconId || 29,
-        summonerLevel: payload.summoner.summonerLevel || 1
+        summonerLevel: payload.summoner.summonerLevel || 1,
       };
     }
 
@@ -687,7 +764,7 @@
         queueName: payload.lobby.queueName || 'Ranked Solo/Duo',
         isLeader: payload.lobby.isLeader !== undefined ? payload.lobby.isLeader : true,
         canStartQueue: payload.lobby.canStartQueue !== undefined ? payload.lobby.canStartQueue : true,
-        members: Array.isArray(payload.lobby.members) ? payload.lobby.members : []
+        members: Array.isArray(payload.lobby.members) ? payload.lobby.members : [],
       };
     }
 
@@ -697,7 +774,7 @@
         inQueue: Boolean(payload.queue.inQueue),
         timeInQueue: payload.queue.timeInQueue || 0,
         estimatedTime: payload.queue.estimatedTime || 90,
-        queueId: payload.queue.queueId || state.lobby.queueId
+        queueId: payload.queue.queueId || state.lobby.queueId,
       };
 
       if (state.phase === 'IN_QUEUE' && state.queue.inQueue) {
@@ -728,7 +805,7 @@
         timerMax: payload.readyCheck.timerMax || 10,
         numAccepted: payload.readyCheck.numAccepted || 0,
         numDeclined: payload.readyCheck.numDeclined || 0,
-        totalPlayers: payload.readyCheck.totalPlayers || 10
+        totalPlayers: payload.readyCheck.totalPlayers || 10,
       };
 
       if (state.phase === 'READY_CHECK' && state.readyCheck.state === 'InProgress') {
@@ -770,29 +847,32 @@
         myPickIntent: cs.myPickIntent || 0,
         timer: {
           phase: cs.timer?.phase || 'NONE',
-          adjustedTimeLeftInPhase: cs.timer?.adjustedTimeLeftInPhase !== undefined ? cs.timer.adjustedTimeLeftInPhase : 30,
-          totalTimeInPhase: cs.timer?.totalTimeInPhase !== undefined ? cs.timer.totalTimeInPhase : 30
+          adjustedTimeLeftInPhase:
+            cs.timer?.adjustedTimeLeftInPhase !== undefined ? cs.timer.adjustedTimeLeftInPhase : 30,
+          totalTimeInPhase: cs.timer?.totalTimeInPhase !== undefined ? cs.timer.totalTimeInPhase : 30,
         },
         bans: {
           myTeamBans: cs.bans?.myTeamBans || [],
-          theirTeamBans: cs.bans?.theirTeamBans || []
+          theirTeamBans: cs.bans?.theirTeamBans || [],
         },
         myTeam: Array.isArray(cs.myTeam) ? cs.myTeam : [],
         theirTeam: Array.isArray(cs.theirTeam) ? cs.theirTeam : [],
         mySelection: {
           spell1Id: cs.mySelection?.spell1Id || 4,
           spell2Id: cs.mySelection?.spell2Id || 14,
-          selectedChampionId: cs.mySelection?.selectedChampionId || 0
+          selectedChampionId: cs.mySelection?.selectedChampionId || 0,
         },
         pickMode: (cs.pickMode || 'DRAFT').toUpperCase(),
         benchEnabled: Boolean(cs.benchEnabled),
         bench: Array.isArray(cs.bench)
           ? cs.bench
-            .map(entry => (typeof entry === 'object' && entry !== null
-              ? { championId: Number(entry.championId) || 0, isPriority: Boolean(entry.isPriority) }
-              : { championId: Number(entry) || 0, isPriority: false }))
-            .filter(entry => entry.championId > 0)
-          : []
+              .map((entry) =>
+                typeof entry === 'object' && entry !== null
+                  ? { championId: Number(entry.championId) || 0, isPriority: Boolean(entry.isPriority) }
+                  : { championId: Number(entry) || 0, isPriority: false },
+              )
+              .filter((entry) => entry.championId > 0)
+          : [],
       };
 
       if (state.phase === 'CHAMP_SELECT' && state.champSelect.sessionActive) {
@@ -987,18 +1067,18 @@
 
   function switchView(targetPhase) {
     const viewMap = {
-      'DISCONNECTED': 'view-disconnected',
-      'NONE': 'view-lobby',
-      'LOBBY': 'view-lobby',
-      'IN_QUEUE': 'view-in-queue',
-      'READY_CHECK': 'view-ready-check',
-      'CHAMP_SELECT': 'view-champ-select',
-      'IN_GAME': 'view-in-game'
+      DISCONNECTED: 'view-disconnected',
+      NONE: 'view-lobby',
+      LOBBY: 'view-lobby',
+      IN_QUEUE: 'view-in-queue',
+      READY_CHECK: 'view-ready-check',
+      CHAMP_SELECT: 'view-champ-select',
+      IN_GAME: 'view-in-game',
     };
 
     const targetId = viewMap[targetPhase] || 'view-disconnected';
 
-    document.querySelectorAll('.view-panel').forEach(panel => {
+    document.querySelectorAll('.view-panel').forEach((panel) => {
       if (panel.id === targetId) {
         panel.classList.add('active');
         panel.classList.remove('hidden');
@@ -1013,7 +1093,9 @@
   function renderDisconnectedView() {
     const statusText = document.getElementById('reconnect-status');
     if (statusText) {
-      statusText.textContent = localState.wsConnected ? 'Connected to server, waiting for client...' : 'Attempting to reach backend...';
+      statusText.textContent = localState.wsConnected
+        ? 'Connected to server, waiting for client...'
+        : 'Attempting to reach backend...';
     }
   }
 
@@ -1025,7 +1107,7 @@
     }
 
     // Queue button active state
-    document.querySelectorAll('.queue-btn').forEach(btn => {
+    document.querySelectorAll('.queue-btn').forEach((btn) => {
       const qId = Number(btn.getAttribute('data-queue-id'));
       if (qId === state.lobby.queueId) {
         btn.classList.add('active');
@@ -1039,19 +1121,22 @@
     const membersCount = document.getElementById('members-count');
     if (membersList) {
       membersList.innerHTML = '';
-      const members = state.lobby.members.length > 0 ? state.lobby.members : [
-        {
-          summonerName: state.summoner.displayName || 'You',
-          profileIconId: state.summoner.profileIconId || 29,
-          isLeader: true,
-          firstPositionPreference: document.getElementById('select-role-primary')?.value || 'MIDDLE',
-          secondPositionPreference: document.getElementById('select-role-secondary')?.value || 'BOTTOM'
-        }
-      ];
+      const members =
+        state.lobby.members.length > 0
+          ? state.lobby.members
+          : [
+              {
+                summonerName: state.summoner.displayName || 'You',
+                profileIconId: state.summoner.profileIconId || 29,
+                isLeader: true,
+                firstPositionPreference: document.getElementById('select-role-primary')?.value || 'MIDDLE',
+                secondPositionPreference: document.getElementById('select-role-secondary')?.value || 'BOTTOM',
+              },
+            ];
 
       if (membersCount) membersCount.textContent = `${members.length} / 5`;
 
-      members.forEach(m => {
+      members.forEach((m) => {
         const row = document.createElement('div');
         row.className = 'member-row';
         row.innerHTML = `
@@ -1103,7 +1188,7 @@
 
     if (!localState.queueStartMs) {
       const serverElapsed = state.queue.timeInQueue || 0;
-      localState.queueStartMs = Date.now() - (serverElapsed * 1000);
+      localState.queueStartMs = Date.now() - serverElapsed * 1000;
     }
 
     const elapsedMs = Math.max(0, Date.now() - localState.queueStartMs);
@@ -1174,7 +1259,7 @@
 
     if (!localState.readyCheckTargetEndMs) {
       const serverLeft = state.readyCheck.timer !== undefined ? state.readyCheck.timer : 10;
-      localState.readyCheckTargetEndMs = Date.now() + (serverLeft * 1000);
+      localState.readyCheckTargetEndMs = Date.now() + serverLeft * 1000;
     }
 
     const remainingMs = Math.max(0, localState.readyCheckTargetEndMs - Date.now());
@@ -1218,7 +1303,7 @@
 
   function getLocalChampionId() {
     const cs = state.champSelect;
-    const me = cs.myTeam.find(m => m.isLocalPlayer || m.cellId === cs.cellId);
+    const me = cs.myTeam.find((m) => m.isLocalPlayer || m.cellId === cs.cellId);
     return (me && (me.championId || me.displayedChampionId)) || cs.mySelection.selectedChampionId || 0;
   }
 
@@ -1290,17 +1375,13 @@
       }
     }
     const strKey = String(idOrKey).toLowerCase();
-    const foundInList = localState.champions.find(c =>
-      c.id === numId ||
-      String(c.key).toLowerCase() === strKey ||
-      String(c.name).toLowerCase() === strKey
+    const foundInList = localState.champions.find(
+      (c) => c.id === numId || String(c.key).toLowerCase() === strKey || String(c.name).toLowerCase() === strKey,
     );
     if (foundInList) return foundInList;
 
-    const foundInFallback = POPULAR_CHAMPIONS_FALLBACK.find(c =>
-      c.id === numId ||
-      String(c.key).toLowerCase() === strKey ||
-      String(c.name).toLowerCase() === strKey
+    const foundInFallback = POPULAR_CHAMPIONS_FALLBACK.find(
+      (c) => c.id === numId || String(c.key).toLowerCase() === strKey || String(c.name).toLowerCase() === strKey,
     );
     if (foundInFallback) return foundInFallback;
 
@@ -1325,8 +1406,8 @@
       }
     }
 
-    const priorityCards = cs.bench.filter(entry => entry.isPriority);
-    const poolCards = cs.bench.filter(entry => !entry.isPriority);
+    const priorityCards = cs.bench.filter((entry) => entry.isPriority);
+    const poolCards = cs.bench.filter((entry) => !entry.isPriority);
 
     // Dynamic label depending on whether starter has been selected yet
     const cardsLabel = document.getElementById('cs-bench-cards-label');
@@ -1361,7 +1442,7 @@
     row.innerHTML = '';
     if (!hasEntries) return;
 
-    entries.forEach(entry => {
+    entries.forEach((entry) => {
       const card = buildBenchCard(entry.championId, { priority: isPriority });
       if (card) row.appendChild(card);
     });
@@ -1406,9 +1487,9 @@
     // Optimistic swap; a rejected swap is corrected by the next server state push
     localState.benchSwapPending = championId;
     cs.bench = cs.bench
-      .filter(entry => entry.championId !== championId)
+      .filter((entry) => entry.championId !== championId)
       .concat(previousChampionId ? [{ championId: previousChampionId, isPriority: false }] : []);
-    cs.myTeam.forEach(m => {
+    cs.myTeam.forEach((m) => {
       if (m.isLocalPlayer || m.cellId === cs.cellId) {
         m.championId = championId;
         m.displayedChampionId = championId;
@@ -1430,7 +1511,7 @@
     if (ok === false) {
       cs.bench = previousBench;
       cs.mySelection.selectedChampionId = previousSelection;
-      cs.myTeam.forEach(m => {
+      cs.myTeam.forEach((m) => {
         if (m.isLocalPlayer || m.cellId === cs.cellId) {
           m.championId = previousChampionId;
           m.displayedChampionId = previousChampionId;
@@ -1450,7 +1531,7 @@
 
     if (!localState.csTargetEndMs) {
       const serverLeft = cs.timer?.adjustedTimeLeftInPhase !== undefined ? cs.timer.adjustedTimeLeftInPhase : 30;
-      localState.csTargetEndMs = Date.now() + (serverLeft * 1000);
+      localState.csTargetEndMs = Date.now() + serverLeft * 1000;
     }
 
     const remainingMs = Math.max(0, localState.csTargetEndMs - Date.now());
@@ -1496,7 +1577,7 @@
     // Ally Team
     if (allyRoster) {
       allyRoster.innerHTML = '';
-      cs.myTeam.forEach(member => {
+      cs.myTeam.forEach((member) => {
         const champId = member.displayedChampionId || member.championId || member.championPickIntent;
         const champ = localState.championsMap.get(champId);
         const s1 = localState.spellsMap.get(member.spell1Id);
@@ -1522,7 +1603,7 @@
     // Enemy Team
     if (enemyRoster) {
       enemyRoster.innerHTML = '';
-      cs.theirTeam.forEach(enemy => {
+      cs.theirTeam.forEach((enemy) => {
         const champ = localState.championsMap.get(enemy.championId);
         const slot = document.createElement('div');
         slot.className = 'player-slot-card';
@@ -1537,22 +1618,26 @@
     // Bans
     if (allyBansEl) {
       allyBansEl.innerHTML = '';
-      cs.bans.myTeamBans.forEach(bId => {
+      cs.bans.myTeamBans.forEach((bId) => {
         const champ = localState.championsMap.get(bId);
         const b = document.createElement('div');
         b.className = 'ban-slot-mini';
-        b.innerHTML = champ ? `<img class="ban-champ-img" src="${getChampionIconUrl(champ.key)}"><div class="ban-slash"></div>` : '<div class="ban-slash"></div>';
+        b.innerHTML = champ
+          ? `<img class="ban-champ-img" src="${getChampionIconUrl(champ.key)}"><div class="ban-slash"></div>`
+          : '<div class="ban-slash"></div>';
         allyBansEl.appendChild(b);
       });
     }
 
     if (enemyBansEl) {
       enemyBansEl.innerHTML = '';
-      cs.bans.theirTeamBans.forEach(bId => {
+      cs.bans.theirTeamBans.forEach((bId) => {
         const champ = localState.championsMap.get(bId);
         const b = document.createElement('div');
         b.className = 'ban-slot-mini';
-        b.innerHTML = champ ? `<img class="ban-champ-img" src="${getChampionIconUrl(champ.key)}"><div class="ban-slash"></div>` : '<div class="ban-slash"></div>';
+        b.innerHTML = champ
+          ? `<img class="ban-champ-img" src="${getChampionIconUrl(champ.key)}"><div class="ban-slash"></div>`
+          : '<div class="ban-slash"></div>';
         enemyBansEl.appendChild(b);
       });
     }
@@ -1563,7 +1648,7 @@
     const benchMode = isBenchMode();
     const selectedId = benchMode
       ? getLocalChampionId()
-      : (localState.selectedChampionId || cs.myPickIntent || cs.mySelection.selectedChampionId);
+      : localState.selectedChampionId || cs.myPickIntent || cs.mySelection.selectedChampionId;
     const champ = localState.championsMap.get(selectedId);
 
     const previewIcon = document.getElementById('cs-preview-icon');
@@ -1625,13 +1710,14 @@
     const cs = state.champSelect;
     const isBanMode = cs.actionPhase === 'BAN';
 
-    const filtered = localState.champions.filter(champ => {
-      const matchesSearch = !query || champ.name.toLowerCase().includes(query) || champ.key.toLowerCase().includes(query);
+    const filtered = localState.champions.filter((champ) => {
+      const matchesSearch =
+        !query || champ.name.toLowerCase().includes(query) || champ.key.toLowerCase().includes(query);
       const matchesRole = filterRole === 'ALL' || champ.roles.includes(filterRole);
       return matchesSearch && matchesRole;
     });
 
-    filtered.forEach(champ => {
+    filtered.forEach((champ) => {
       const card = document.createElement('div');
       const isSelected = localState.selectedChampionId === champ.id;
       const isBanned = cs.bans.myTeamBans.includes(champ.id) || cs.bans.theirTeamBans.includes(champ.id);
@@ -1663,7 +1749,7 @@
 
     // Optimistically update local player pick intent in roster
     if (Array.isArray(cs.myTeam)) {
-      cs.myTeam.forEach(m => {
+      cs.myTeam.forEach((m) => {
         if (m.isLocalPlayer || m.cellId === cs.cellId) {
           m.championPickIntent = champ.id;
           if (!m.isLocked) {
@@ -1675,7 +1761,7 @@
     }
 
     // Highlight selected card
-    document.querySelectorAll('.champ-card').forEach(c => {
+    document.querySelectorAll('.champ-card').forEach((c) => {
       if (Number(c.getAttribute('data-champ-id')) === champ.id) {
         c.classList.add('selected');
         if (cs.actionPhase === 'BAN' && cs.isMyTurn) {
@@ -1693,14 +1779,12 @@
     renderTeamRosters();
 
     // Determine action ID (active action if my turn, otherwise local pick action)
-    const targetActionId = (cs.isMyTurn && cs.activeAction)
-      ? cs.activeAction.id
-      : (cs.localPickActionId || 0);
+    const targetActionId = cs.isMyTurn && cs.activeAction ? cs.activeAction.id : cs.localPickActionId || 0;
 
     // Send hover / preselection to LCU / Backend immediately
     sendApiRequest('/api/champ-select/hover', {
       actionId: targetActionId,
-      championId: champ.id
+      championId: champ.id,
     });
   }
 
@@ -1710,7 +1794,7 @@
     if (!grid) return;
 
     grid.innerHTML = '';
-    localState.spells.forEach(spell => {
+    localState.spells.forEach((spell) => {
       const card = document.createElement('div');
       card.className = 'spell-select-card';
       card.innerHTML = `
@@ -1767,7 +1851,7 @@
 
     await sendApiRequest('/api/champ-select/spells', {
       spell1Id: newS1,
-      spell2Id: newS2
+      spell2Id: newS2,
     });
   }
 
@@ -1856,19 +1940,22 @@
       btnCopyQr.addEventListener('click', () => {
         const urlInput = document.getElementById('qr-url-input');
         if (urlInput && urlInput.value) {
-          navigator.clipboard.writeText(urlInput.value).then(() => {
-            const copyBtnText = document.getElementById('copy-btn-text');
-            if (copyBtnText) copyBtnText.textContent = 'COPIED! ✓';
-            showToast('LAN URL copied to clipboard!', 'success');
-            playClickSound();
-            setTimeout(() => {
-              if (copyBtnText) copyBtnText.textContent = 'COPY';
-            }, 2000);
-          }).catch(() => {
-            urlInput.select();
-            document.execCommand('copy');
-            showToast('LAN URL copied!', 'success');
-          });
+          navigator.clipboard
+            .writeText(urlInput.value)
+            .then(() => {
+              const copyBtnText = document.getElementById('copy-btn-text');
+              if (copyBtnText) copyBtnText.textContent = 'COPIED! ✓';
+              showToast('LAN URL copied to clipboard!', 'success');
+              playClickSound();
+              setTimeout(() => {
+                if (copyBtnText) copyBtnText.textContent = 'COPY';
+              }, 2000);
+            })
+            .catch(() => {
+              urlInput.select();
+              document.execCommand('copy');
+              showToast('LAN URL copied!', 'success');
+            });
         }
       });
     }
@@ -1888,7 +1975,7 @@
       const queueName = btn.querySelector('.q-name')?.textContent || 'Queue';
 
       // Optimistically update active state immediately for instant tactile response
-      document.querySelectorAll('.queue-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.queue-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
 
       state.lobby.queueId = queueId;
@@ -1902,7 +1989,7 @@
     }
 
     // Queue Selectors in Lobby
-    document.querySelectorAll('.queue-btn').forEach(btn => {
+    document.querySelectorAll('.queue-btn').forEach((btn) => {
       btn.addEventListener('click', () => onQueueButtonClicked(btn));
     });
     // Role Selectors
@@ -1917,7 +2004,7 @@
         if (sIcon) sIcon.textContent = selectS.value.substring(0, 3);
         sendApiRequest('/api/lobby/positions', {
           first: selectP.value,
-          second: selectS.value
+          second: selectS.value,
         });
       };
       selectP.addEventListener('change', onRoleChange);
@@ -1992,10 +2079,10 @@
     }
 
     // Champ Select Role Tabs
-    document.querySelectorAll('.role-tab').forEach(tab => {
+    document.querySelectorAll('.role-tab').forEach((tab) => {
       tab.addEventListener('click', () => {
         playClickSound();
-        document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.role-tab').forEach((t) => t.classList.remove('active'));
         tab.classList.add('active');
         localState.activeRoleFilter = tab.getAttribute('data-role') || 'ALL';
         renderChampionsGrid();
@@ -2029,14 +2116,14 @@
           await sendApiRequest('/api/champ-select/action', {
             actionId: cs.activeAction.id,
             championId: champId,
-            completed: true
+            completed: true,
           });
         } else {
           // Pre-select Pick Intent confirmation
           const targetActionId = cs.localPickActionId || 0;
           await sendApiRequest('/api/champ-select/hover', {
             actionId: targetActionId,
-            championId: champId
+            championId: champId,
           });
 
           // Visual feedback
@@ -2108,7 +2195,7 @@
 
     if (adaptersContainer && adapterSelect && Array.isArray(data.interfaces) && data.interfaces.length > 1) {
       adapterSelect.innerHTML = '';
-      data.interfaces.forEach(iface => {
+      data.interfaces.forEach((iface) => {
         const opt = document.createElement('option');
         opt.value = iface.url;
         opt.textContent = `${iface.ip} (${iface.interface} - ${iface.type})`;
@@ -2170,5 +2257,4 @@
   } else {
     init();
   }
-
 })();

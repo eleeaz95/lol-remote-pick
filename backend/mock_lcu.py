@@ -3,10 +3,10 @@
 import asyncio
 import json
 import logging
-from typing import Dict, Any, List, Optional, Set
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status, Response
-from fastapi.responses import JSONResponse
+from typing import Any, Dict, Optional, Set
+
 import uvicorn
+from fastapi import FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
 
 from .lcu_connector import LCUCredentials
 from .state_engine import BENCH_QUEUE_IDS
@@ -25,7 +25,13 @@ MOCK_CHAMPIONS = [
     {"id": 99, "name": "Lux", "alias": "Lux", "roles": ["support", "middle"], "ownership": {"owned": True}},
     {"id": 157, "name": "Yasuo", "alias": "Yasuo", "roles": ["middle", "top"], "ownership": {"owned": True}},
     {"id": 238, "name": "Zed", "alias": "Zed", "roles": ["middle"], "ownership": {"owned": True}},
-    {"id": 147, "name": "Seraphine", "alias": "Seraphine", "roles": ["support", "middle"], "ownership": {"owned": True}},
+    {
+        "id": 147,
+        "name": "Seraphine",
+        "alias": "Seraphine",
+        "roles": ["support", "middle"],
+        "ownership": {"owned": True},
+    },
     {"id": 412, "name": "Thresh", "alias": "Thresh", "roles": ["support"], "ownership": {"owned": True}},
     {"id": 804, "name": "Yunara", "alias": "Yunara", "roles": ["bottom"], "ownership": {"owned": True}},
     {"id": 800, "name": "Mel", "alias": "Mel", "roles": ["middle", "support"], "ownership": {"owned": True}},
@@ -37,24 +43,104 @@ MOCK_CHAMPIONS = [
 
 # Sample mock summoner spells
 MOCK_SPELLS = [
-    {"id": 4, "name": "Flash", "description": "Teleports your champion a short distance towards your cursor's location.", "iconPath": "/lol-game-data/assets/v1/summoner-spells/4.png"},
-    {"id": 14, "name": "Ignite", "description": "Ignites target enemy champion.", "iconPath": "/lol-game-data/assets/v1/summoner-spells/14.png"},
-    {"id": 11, "name": "Smite", "description": "Deals true damage to target epic, large, or medium monster or enemy minion.", "iconPath": "/lol-game-data/assets/v1/summoner-spells/11.png"},
-    {"id": 12, "name": "Teleport", "description": "After channeling for 4 seconds, teleports your champion to target allied structure.", "iconPath": "/lol-game-data/assets/v1/summoner-spells/12.png"},
-    {"id": 7, "name": "Heal", "description": "Restores health and grants movement speed to you and target allied champion.", "iconPath": "/lol-game-data/assets/v1/summoner-spells/7.png"},
-    {"id": 3, "name": "Exhaust", "description": "Exhausts target enemy champion, reducing their Movement Speed and damage.", "iconPath": "/lol-game-data/assets/v1/summoner-spells/3.png"},
-    {"id": 6, "name": "Ghost", "description": "Gain increased Movement Speed and ignore unit collision.", "iconPath": "/lol-game-data/assets/v1/summoner-spells/6.png"},
-    {"id": 21, "name": "Barrier", "description": "Shields your champion from damage for 2.5 seconds.", "iconPath": "/lol-game-data/assets/v1/summoner-spells/21.png"},
-    {"id": 1, "name": "Cleanse", "description": "Removes all disables and summoner spell debuffs affecting your champion.", "iconPath": "/lol-game-data/assets/v1/summoner-spells/1.png"},
+    {
+        "id": 4,
+        "name": "Flash",
+        "description": "Teleports your champion a short distance towards your cursor's location.",
+        "iconPath": "/lol-game-data/assets/v1/summoner-spells/4.png",
+    },
+    {
+        "id": 14,
+        "name": "Ignite",
+        "description": "Ignites target enemy champion.",
+        "iconPath": "/lol-game-data/assets/v1/summoner-spells/14.png",
+    },
+    {
+        "id": 11,
+        "name": "Smite",
+        "description": "Deals true damage to target epic, large, or medium monster or enemy minion.",
+        "iconPath": "/lol-game-data/assets/v1/summoner-spells/11.png",
+    },
+    {
+        "id": 12,
+        "name": "Teleport",
+        "description": "After channeling for 4 seconds, teleports your champion to target allied structure.",
+        "iconPath": "/lol-game-data/assets/v1/summoner-spells/12.png",
+    },
+    {
+        "id": 7,
+        "name": "Heal",
+        "description": "Restores health and grants movement speed to you and target allied champion.",
+        "iconPath": "/lol-game-data/assets/v1/summoner-spells/7.png",
+    },
+    {
+        "id": 3,
+        "name": "Exhaust",
+        "description": "Exhausts target enemy champion, reducing their Movement Speed and damage.",
+        "iconPath": "/lol-game-data/assets/v1/summoner-spells/3.png",
+    },
+    {
+        "id": 6,
+        "name": "Ghost",
+        "description": "Gain increased Movement Speed and ignore unit collision.",
+        "iconPath": "/lol-game-data/assets/v1/summoner-spells/6.png",
+    },
+    {
+        "id": 21,
+        "name": "Barrier",
+        "description": "Shields your champion from damage for 2.5 seconds.",
+        "iconPath": "/lol-game-data/assets/v1/summoner-spells/21.png",
+    },
+    {
+        "id": 1,
+        "name": "Cleanse",
+        "description": "Removes all disables and summoner spell debuffs affecting your champion.",
+        "iconPath": "/lol-game-data/assets/v1/summoner-spells/1.png",
+    },
 ]
 
 # Sample mock queues
 MOCK_QUEUES = [
-    {"id": 420, "name": "Ranked Solo/Duo", "shortName": "Solo/Duo", "description": "5v5 Ranked Solo/Duo on Summoner's Rift", "isRanked": True, "category": "PvP"},
-    {"id": 400, "name": "Normal Draft", "shortName": "Draft Pick", "description": "5v5 Normal Draft on Summoner's Rift", "isRanked": False, "category": "PvP"},
-    {"id": 440, "name": "Ranked Flex", "shortName": "Flex 5v5", "description": "5v5 Ranked Flex on Summoner's Rift", "isRanked": True, "category": "PvP"},
-    {"id": 450, "name": "ARAM", "shortName": "ARAM", "description": "5v5 All Random All Mid on Howling Abyss", "isRanked": False, "category": "PvP"},
-    {"id": 2400, "name": "ARAM: Mayhem", "shortName": "ARAM Mayhem", "description": "5v5 ARAM Mayhem on Howling Abyss", "isRanked": False, "category": "PvP"},
+    {
+        "id": 420,
+        "name": "Ranked Solo/Duo",
+        "shortName": "Solo/Duo",
+        "description": "5v5 Ranked Solo/Duo on Summoner's Rift",
+        "isRanked": True,
+        "category": "PvP",
+    },
+    {
+        "id": 400,
+        "name": "Normal Draft",
+        "shortName": "Draft Pick",
+        "description": "5v5 Normal Draft on Summoner's Rift",
+        "isRanked": False,
+        "category": "PvP",
+    },
+    {
+        "id": 440,
+        "name": "Ranked Flex",
+        "shortName": "Flex 5v5",
+        "description": "5v5 Ranked Flex on Summoner's Rift",
+        "isRanked": True,
+        "category": "PvP",
+    },
+    {
+        "id": 450,
+        "name": "ARAM",
+        "shortName": "ARAM",
+        "description": "5v5 All Random All Mid on Howling Abyss",
+        "isRanked": False,
+        "category": "PvP",
+    },
+    {
+        "id": 2400,
+        "name": "ARAM: Mayhem",
+        "shortName": "ARAM Mayhem",
+        "description": "5v5 ARAM Mayhem on Howling Abyss",
+        "isRanked": False,
+        "category": "PvP",
+    },
 ]
 
 
@@ -94,11 +180,7 @@ class MockLCUServer:
     def get_credentials(self) -> LCUCredentials:
         """Return credentials matching this mock server."""
         return LCUCredentials(
-            port=self.port,
-            password="mock_auth_token",
-            protocol="http",
-            pid=99999,
-            process_name="MockLeagueClient"
+            port=self.port, password="mock_auth_token", protocol="http", pid=99999, process_name="MockLeagueClient"
         )
 
     # --- WebSocket Event Dispatch ---
@@ -112,7 +194,7 @@ class MockLCUServer:
                 "uri": uri,
                 "eventType": event_type,
                 "data": data,
-            }
+            },
         ]
         msg = json.dumps(payload)
         dead = []
@@ -136,7 +218,7 @@ class MockLCUServer:
             self._active_connections.add(websocket)
             try:
                 while True:
-                    text = await websocket.receive_text()
+                    await websocket.receive_text()
                     # Handle WAMP SUBSCRIBE (e.g. [5, "OnJsonApiEvent"])
                     # Send initial snapshot of events if needed
             except WebSocketDisconnect:
@@ -158,7 +240,9 @@ class MockLCUServer:
         async def get_gameflow_session():
             return {
                 "phase": self.gameflow_phase,
-                "gameData": {"queue": {"id": self.lobby.get("gameConfig", {}).get("queueId", 420) if self.lobby else 0}},
+                "gameData": {
+                    "queue": {"id": self.lobby.get("gameConfig", {}).get("queueId", 420) if self.lobby else 0}
+                },
             }
 
         # Lobby
@@ -215,7 +299,9 @@ class MockLCUServer:
         async def accept_ready_check():
             if self.ready_check:
                 self.ready_check["playerResponse"] = "Accepted"
-                self.ready_check["numAccepted"] = min(self.ready_check["totalPlayers"], self.ready_check["numAccepted"] + 1)
+                self.ready_check["numAccepted"] = min(
+                    self.ready_check["totalPlayers"], self.ready_check["numAccepted"] + 1
+                )
                 await self.broadcast_event("/lol-matchmaking/v1/ready-check", self.ready_check)
             return Response(status_code=204)
 
@@ -470,11 +556,46 @@ class MockLCUServer:
                 "theirTeamBans": [238],
             },
             "myTeam": [
-                {"cellId": 0, "summonerName": self.summoner["displayName"], "assignedPosition": "top", "championId": 0, "spell1Id": 4, "spell2Id": 12},
-                {"cellId": 1, "summonerName": "AlliedJungler", "assignedPosition": "jungle", "championId": 64, "spell1Id": 4, "spell2Id": 11},
-                {"cellId": 2, "summonerName": "AlliedMid", "assignedPosition": "middle", "championId": 103, "spell1Id": 4, "spell2Id": 14},
-                {"cellId": 3, "summonerName": "AlliedADC", "assignedPosition": "bottom", "championId": 222, "spell1Id": 4, "spell2Id": 7},
-                {"cellId": 4, "summonerName": "AlliedSup", "assignedPosition": "support", "championId": 412, "spell1Id": 4, "spell2Id": 3},
+                {
+                    "cellId": 0,
+                    "summonerName": self.summoner["displayName"],
+                    "assignedPosition": "top",
+                    "championId": 0,
+                    "spell1Id": 4,
+                    "spell2Id": 12,
+                },
+                {
+                    "cellId": 1,
+                    "summonerName": "AlliedJungler",
+                    "assignedPosition": "jungle",
+                    "championId": 64,
+                    "spell1Id": 4,
+                    "spell2Id": 11,
+                },
+                {
+                    "cellId": 2,
+                    "summonerName": "AlliedMid",
+                    "assignedPosition": "middle",
+                    "championId": 103,
+                    "spell1Id": 4,
+                    "spell2Id": 14,
+                },
+                {
+                    "cellId": 3,
+                    "summonerName": "AlliedADC",
+                    "assignedPosition": "bottom",
+                    "championId": 222,
+                    "spell1Id": 4,
+                    "spell2Id": 7,
+                },
+                {
+                    "cellId": 4,
+                    "summonerName": "AlliedSup",
+                    "assignedPosition": "support",
+                    "championId": 412,
+                    "spell1Id": 4,
+                    "spell2Id": 3,
+                },
             ],
             "theirTeam": [
                 {"cellId": 5, "assignedPosition": "top", "championId": 0},
@@ -491,17 +612,65 @@ class MockLCUServer:
             "actions": [
                 # Ban actions group (Phase 1)
                 [
-                    {"id": 1, "actorCellId": 0, "championId": 0, "type": "ban", "completed": False, "isInProgress": True, "pickTurn": 1},
-                    {"id": 2, "actorCellId": 1, "championId": 0, "type": "ban", "completed": True, "isInProgress": False, "pickTurn": 1},
-                    {"id": 3, "actorCellId": 2, "championId": 0, "type": "ban", "completed": True, "isInProgress": False, "pickTurn": 1},
-                    {"id": 4, "actorCellId": 3, "championId": 0, "type": "ban", "completed": True, "isInProgress": False, "pickTurn": 1},
-                    {"id": 5, "actorCellId": 4, "championId": 0, "type": "ban", "completed": True, "isInProgress": False, "pickTurn": 1},
+                    {
+                        "id": 1,
+                        "actorCellId": 0,
+                        "championId": 0,
+                        "type": "ban",
+                        "completed": False,
+                        "isInProgress": True,
+                        "pickTurn": 1,
+                    },
+                    {
+                        "id": 2,
+                        "actorCellId": 1,
+                        "championId": 0,
+                        "type": "ban",
+                        "completed": True,
+                        "isInProgress": False,
+                        "pickTurn": 1,
+                    },
+                    {
+                        "id": 3,
+                        "actorCellId": 2,
+                        "championId": 0,
+                        "type": "ban",
+                        "completed": True,
+                        "isInProgress": False,
+                        "pickTurn": 1,
+                    },
+                    {
+                        "id": 4,
+                        "actorCellId": 3,
+                        "championId": 0,
+                        "type": "ban",
+                        "completed": True,
+                        "isInProgress": False,
+                        "pickTurn": 1,
+                    },
+                    {
+                        "id": 5,
+                        "actorCellId": 4,
+                        "championId": 0,
+                        "type": "ban",
+                        "completed": True,
+                        "isInProgress": False,
+                        "pickTurn": 1,
+                    },
                 ],
                 # Pick actions group (Phase 2)
                 [
-                    {"id": 6, "actorCellId": 0, "championId": 0, "type": "pick", "completed": False, "isInProgress": False, "pickTurn": 2},
-                ]
-            ]
+                    {
+                        "id": 6,
+                        "actorCellId": 0,
+                        "championId": 0,
+                        "type": "pick",
+                        "completed": False,
+                        "isInProgress": False,
+                        "pickTurn": 2,
+                    },
+                ],
+            ],
         }
 
     def _build_bench_session(self) -> Dict[str, Any]:
@@ -527,11 +696,46 @@ class MockLCUServer:
                 "theirTeamBans": [],
             },
             "myTeam": [
-                {"cellId": 0, "summonerName": self.summoner["displayName"], "assignedPosition": "", "championId": 32, "spell1Id": 4, "spell2Id": 32},
-                {"cellId": 1, "summonerName": "AlliedTwo", "assignedPosition": "", "championId": 64, "spell1Id": 4, "spell2Id": 32},
-                {"cellId": 2, "summonerName": "AlliedThree", "assignedPosition": "", "championId": 103, "spell1Id": 4, "spell2Id": 32},
-                {"cellId": 3, "summonerName": "AlliedFour", "assignedPosition": "", "championId": 222, "spell1Id": 4, "spell2Id": 32},
-                {"cellId": 4, "summonerName": "AlliedFive", "assignedPosition": "", "championId": 412, "spell1Id": 4, "spell2Id": 32},
+                {
+                    "cellId": 0,
+                    "summonerName": self.summoner["displayName"],
+                    "assignedPosition": "",
+                    "championId": 32,
+                    "spell1Id": 4,
+                    "spell2Id": 32,
+                },
+                {
+                    "cellId": 1,
+                    "summonerName": "AlliedTwo",
+                    "assignedPosition": "",
+                    "championId": 64,
+                    "spell1Id": 4,
+                    "spell2Id": 32,
+                },
+                {
+                    "cellId": 2,
+                    "summonerName": "AlliedThree",
+                    "assignedPosition": "",
+                    "championId": 103,
+                    "spell1Id": 4,
+                    "spell2Id": 32,
+                },
+                {
+                    "cellId": 3,
+                    "summonerName": "AlliedFour",
+                    "assignedPosition": "",
+                    "championId": 222,
+                    "spell1Id": 4,
+                    "spell2Id": 32,
+                },
+                {
+                    "cellId": 4,
+                    "summonerName": "AlliedFive",
+                    "assignedPosition": "",
+                    "championId": 412,
+                    "spell1Id": 4,
+                    "spell2Id": 32,
+                },
             ],
             "theirTeam": [
                 {"cellId": 5, "assignedPosition": "", "championId": 0},
@@ -548,7 +752,15 @@ class MockLCUServer:
             # ARAM assigns the pick automatically: the action exists but is already completed
             "actions": [
                 [
-                    {"id": 1, "actorCellId": 0, "championId": 32, "type": "pick", "completed": True, "isInProgress": False, "pickTurn": 1},
+                    {
+                        "id": 1,
+                        "actorCellId": 0,
+                        "championId": 32,
+                        "type": "pick",
+                        "completed": True,
+                        "isInProgress": False,
+                        "pickTurn": 1,
+                    },
                 ]
             ],
         }

@@ -4,7 +4,8 @@ import asyncio
 import json
 import logging
 import ssl
-from typing import Callable, Optional, Coroutine, Any, List, Union
+from typing import Any, Callable, Coroutine, List, Optional, Union
+
 import websockets
 
 from .lcu_connector import LCUCredentials
@@ -68,7 +69,6 @@ class LCUWebSocket:
         if callback in self._subscribers:
             self._subscribers.remove(callback)
 
-
     def subscribe_connection(self, callback: ConnectionCallback) -> None:
         """Register a connection status change callback."""
         if callback not in self._conn_subscribers:
@@ -78,6 +78,7 @@ class LCUWebSocket:
         """Unregister a connection status change callback."""
         if callback in self._conn_subscribers:
             self._conn_subscribers.remove(callback)
+
     def _create_ssl_context(self) -> Optional[ssl.SSLContext]:
         """Create SSL context that skips certificate verification for local LCU."""
         if not self._credentials or self._credentials.protocol == "http":
@@ -135,7 +136,9 @@ class LCUWebSocket:
                     for cb in self._conn_subscribers:
                         asyncio.create_task(self._safe_call_conn_cb(cb, False))
             else:
-                if self._connected and (self._disconnect_debounce_task is None or self._disconnect_debounce_task.done()):
+                if self._connected and (
+                    self._disconnect_debounce_task is None or self._disconnect_debounce_task.done()
+                ):
                     self._disconnect_debounce_task = asyncio.create_task(self._debounced_disconnect())
 
     async def _debounced_disconnect(self) -> None:
@@ -156,6 +159,7 @@ class LCUWebSocket:
                 await res
         except Exception as e:
             logger.error(f"Error in connection callback: {e}")
+
     async def _safe_call_conn(self, connected: bool) -> None:
         try:
             if self._connection_callback:
@@ -182,7 +186,7 @@ class LCUWebSocket:
         try:
             if isinstance(message, bytes):
                 message = message.decode("utf-8")
-            
+
             data = json.loads(message)
             # WAMP message format: [opcode, eventName, payload]
             # Opcode 8 is EVENT: [8, "OnJsonApiEvent", {"uri": "...", "eventType": "...", "data": ...}]

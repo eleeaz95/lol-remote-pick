@@ -18,15 +18,14 @@ Verifies end-to-end functionality of:
 """
 
 import asyncio
-import json
+
+import httpx
 import pytest
 import pytest_asyncio
-import httpx
 from httpx import ASGITransport
 
 from backend.config import Settings
 from backend.server import create_app
-from backend.champ_data import get_all_champions, get_all_spells, get_all_queues
 
 
 @pytest_asyncio.fixture
@@ -36,7 +35,7 @@ async def mock_app_and_client():
     settings = Settings(
         mock_mode=True,
         mock_port=18888,
-        mock_auto_progress=False, # Controlled step-by-step in tests
+        mock_auto_progress=False,  # Controlled step-by-step in tests
         static_dir=None,
     )
 
@@ -111,8 +110,8 @@ async def test_api_catalog_endpoints(mock_app_and_client):
     queues = res_queues.json()
     assert isinstance(queues, list)
     q_ids = [q["queueId"] for q in queues]
-    assert 420 in q_ids # Ranked Solo/Duo
-    assert 450 in q_ids # ARAM
+    assert 420 in q_ids  # Ranked Solo/Duo
+    assert 450 in q_ids  # ARAM
 
 
 @pytest.mark.asyncio
@@ -254,7 +253,6 @@ async def test_champ_select_flow(mock_app_and_client):
     res_state_hover = await client.get("/api/state")
     state_hover = res_state_hover.json()
     assert state_hover["champSelect"]["myPickIntent"] == 804
-
 
     # 5. Lock in Pick (e.g. Ahri 103)
     res_pick = await client.post(

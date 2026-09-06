@@ -1,0 +1,12 @@
+{
+  "name": "lol-remote-pick-tooling",
+  "private": true,
+  "description": "Dev-only tooling for formatting the vanilla frontend assets. Not required to run the app.",
+  "scripts": {
+    "format": "prettier --write \"frontend/**/*.{js,css}\"",
+    "format:check": "prettier --check \"frontend/**/*.{js,css}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.0.0"
+  }
+}

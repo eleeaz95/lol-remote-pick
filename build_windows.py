@@ -8,7 +8,6 @@ containing all dependencies, FastAPI backend, and frontend static assets.
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
@@ -20,16 +19,19 @@ DIST_DIR = ROOT_DIR / "dist"
 BUILD_DIR = ROOT_DIR / "build"
 ICON_FILE = ROOT_DIR / "assets" / "icon.ico"
 VERSION_FILE = ROOT_DIR / "version_info.txt"
+
+
 def check_pyinstaller() -> None:
     """Ensure PyInstaller is installed in the current Python environment."""
     try:
-        import PyInstaller
+        import PyInstaller  # noqa: F401  # imported only to probe availability
     except ImportError:
         print("[INFO] Installing PyInstaller...")
         try:
             subprocess.check_call(["uv", "pip", "install", "pyinstaller"])
         except Exception:
             subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
+
 
 def build_executable() -> None:
     """Build the standalone executable with PyInstaller."""
@@ -108,6 +110,8 @@ def build_executable() -> None:
     print(f"  Folder: {out_folder}")
     print(f"  Release ZIP: {zip_output}.zip")
     print("================================================================================\n")
+
+
 if __name__ == "__main__":
     check_pyinstaller()
     build_executable()
