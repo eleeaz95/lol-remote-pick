@@ -865,3 +865,29 @@ async def test_state_engine_lobby_trusts_the_client_position_selector_flag():
         {"gameConfig": {"queueId": 450, "showPositionSelector": True}, "members": []},
     )
     assert engine.get_state()["lobby"]["hasPositions"] is True
+
+
+async def test_state_engine_member_names_fill_in_from_lookup():
+    """Names resolved per puuid land on the members the client left nameless."""
+    engine = StateEngine()
+    engine.set_connected(True)
+    engine.update_from_poll(summoner={"gameName": "Eleeaz", "tagLine": "LAS", "puuid": "abc-123"})
+
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/lobby",
+        {
+            "gameConfig": {"queueId": 400},
+            "members": [
+                {"puuid": "abc-123", "summonerName": "", "isLeader": True},
+                {"puuid": "def-456", "summonerName": "", "isLeader": False},
+            ],
+        },
+    )
+
+    assert engine.get_state()["lobby"]["members"][1]["summonerName"] == ""
+
+    engine.set_member_names({"def-456": "Duo#LAS"})
+
+    members = engine.get_state()["lobby"]["members"]
+    assert members[0]["summonerName"] == "Eleeaz#LAS"
+    assert members[1]["summonerName"] == "Duo#LAS"

@@ -315,6 +315,8 @@ class AppHub:
         self.background_tasks: List[asyncio.Task] = []
         self._subset_ids_loaded = False
         self._subset_last_try = 0.0
+        self._resolved_member_names: Dict[str, str] = {}
+        self._member_names_task: Optional[asyncio.Task] = None
         self._is_running = False
         self._last_broadcast_payload: Optional[Dict[str, Any]] = None
 
@@ -375,6 +377,59 @@ class AppHub:
             self._subset_ids_loaded = True
             self.state_engine.set_subset_champion_ids(subset)
 
+    async def _resolve_member_names(self, lobby: Optional[Dict[str, Any]]) -> None:
+        """Name the other players in the lobby, which takes one lookup per puuid.
+
+        Since the Riot ID migration the client sends lobby members with an empty summonerName,
+        so without this everyone but the local player shows up as a nameless placeholder.
+        """
+        if not isinstance(lobby, dict):
+            return
+
+        pending = []
+        for member in lobby.get("members") or []:
+            if not isinstance(member, dict):
+                continue
+            if member.get("summonerName") or member.get("summonerInternalName"):
+                continue
+            puuid = str(member.get("puuid") or "")
+            if puuid and puuid not in self._resolved_member_names:
+                pending.append(puuid)
+
+        if not pending:
+            return
+
+        resolved: Dict[str, str] = {}
+        for puuid in pending:
+            profile = await self.lcu_client.get_summoner_by_puuid(puuid)
+            if not profile:
+                continue
+            name = profile.get("gameName") or profile.get("displayName") or ""
+            tag_line = profile.get("tagLine")
+            if name and tag_line and "#" not in name:
+                name = f"{name}#{tag_line}"
+            if name:
+                resolved[puuid] = name
+
+        if resolved:
+            self._resolved_member_names.update(resolved)
+            self.state_engine.set_member_names(resolved)
+
+    async def _fetch_lobby_member_names(self, uri: str, data: Any, event_type: str = "Update") -> None:
+        """Resolve party member names whenever the lobby changes.
+
+        The lookups run beside the event stream rather than inside it: a name is decoration, and
+        waiting on it here would hold up the phase changes queued behind this event.
+        """
+        if uri.rstrip("/") != "/lol-lobby/v2/lobby":
+            return
+        if event_type == "Delete":
+            self._resolved_member_names.clear()
+            return
+        if self._member_names_task and not self._member_names_task.done():
+            return
+        self._member_names_task = asyncio.create_task(self._resolve_member_names(data))
+
     async def _on_state_engine_change(self, state: Dict[str, Any]) -> None:
         """Callback registered with StateEngine."""
         await self.broadcast_state(state)
@@ -417,6 +472,8 @@ class AppHub:
                                     if subset:
                                         champ_select["subsetChampionIds"] = subset
 
+                                await self._resolve_member_names(lobby)
+
                                 self.state_engine.update_from_poll(
                                     phase=phase,
                                     summoner=summoner,
@@ -455,6 +512,8 @@ class AppHub:
                                     subset = await self.lcu_client.get_subset_champion_list()
                                     if subset:
                                         champ_select["subsetChampionIds"] = subset
+
+                                await self._resolve_member_names(lobby)
 
                                 self.state_engine.update_from_poll(
                                     phase=phase,
@@ -516,6 +575,7 @@ class AppHub:
             # Wire LCU WebSocket to StateEngine
             self.lcu_ws.subscribe(self.state_engine.handle_lcu_event)
             self.lcu_ws.subscribe(self._fetch_subset_champions)
+            self.lcu_ws.subscribe(self._fetch_lobby_member_names)
             self.lcu_ws.subscribe_connection(self._on_lcu_ws_connection)
             await self.lcu_ws.start()
 
@@ -531,6 +591,7 @@ class AppHub:
 
             self.lcu_ws.subscribe(self.state_engine.handle_lcu_event)
             self.lcu_ws.subscribe(self._fetch_subset_champions)
+            self.lcu_ws.subscribe(self._fetch_lobby_member_names)
             self.lcu_ws.subscribe_connection(self._on_lcu_ws_connection)
             await self.lcu_ws.start()
 
@@ -554,6 +615,9 @@ class AppHub:
             except (asyncio.CancelledError, Exception):
                 pass
         self.background_tasks.clear()
+
+        if self._member_names_task and not self._member_names_task.done():
+            self._member_names_task.cancel()
 
         # Stop LCU WebSocket
         await self.lcu_ws.stop()

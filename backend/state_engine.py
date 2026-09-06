@@ -106,6 +106,7 @@ class StateEngine:
         self._gameflow_phase: str = "None"
         self._raw_summoner: Dict[str, Any] = {}
         self._raw_lobby: Optional[Dict[str, Any]] = None
+        self._member_names: Dict[str, str] = {}
         self._raw_queue: Optional[Dict[str, Any]] = None
         self._raw_ready_check: Optional[Dict[str, Any]] = None
         self._ready_check_started_at: Optional[float] = None
@@ -334,6 +335,16 @@ class StateEngine:
         if state_changed:
             await self._emit_state_change()
 
+    def set_member_names(self, names: Dict[str, str]) -> None:
+        """Attach Riot IDs resolved per puuid, which no lobby payload carries any more."""
+        fresh = {str(puuid): str(name) for puuid, name in (names or {}).items() if puuid and name}
+        if not fresh or all(self._member_names.get(k) == v for k, v in fresh.items()):
+            return
+
+        self._member_names.update(fresh)
+        self._cached_state = None
+        asyncio.create_task(self._emit_state_change())
+
     def set_subset_champion_ids(self, champion_ids: List[Any]) -> None:
         """Attach the pickable card list, which only the REST endpoint exposes.
 
@@ -556,11 +567,13 @@ class StateEngine:
             second_pref = m.get("secondPositionPreference", "UNSELECTED")
 
             # Riot ID migration left summonerName empty on lobby members, and the payload carries no
-            # gameName/tagLine to rebuild it from. The local player is filled in from the fetched profile;
-            # naming the others needs a per-puuid lookup, which normalization cannot perform.
+            # gameName/tagLine to rebuild it from. The local player is filled in from the fetched
+            # profile, everyone else from the per-puuid lookup the hub performs.
             summoner_name = m.get("summonerName") or m.get("summonerInternalName") or ""
             if not summoner_name and is_local:
                 summoner_name = local_display_name
+            if not summoner_name:
+                summoner_name = self._member_names.get(str(m.get("puuid") or ""), "")
 
             members_normalized.append(
                 {

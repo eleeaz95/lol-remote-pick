@@ -106,6 +106,19 @@ class LCUClient:
             return res.json()
         return None
 
+    async def get_summoner_by_puuid(self, puuid: str) -> Optional[Dict[str, Any]]:
+        """Look up another player's profile, which is the only way to learn their Riot ID.
+
+        Lobby and champ select payloads have carried an empty summonerName since the Riot ID
+        migration, so party members can only be named through this lookup.
+        """
+        if not puuid:
+            return None
+        res = await self.request("GET", f"/lol-summoner/v2/summoners/puuid/{puuid}")
+        if res and res.status_code == 200:
+            return res.json()
+        return None
+
     # --- Gameflow Endpoints ---
 
     async def get_gameflow_phase(self) -> Optional[str]:
