@@ -29,6 +29,9 @@ htmlcov/
 # Node (dev-only frontend formatting tooling)
 node_modules/
 
+# Playwright MCP session artifacts (snapshots, console logs)
+.playwright-mcp/
+
 # Environment Variables & Local Configs
 .env
 .env.local
