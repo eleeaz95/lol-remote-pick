@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from typing import Dict, Any, List, Optional, Set
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status, Response
 from fastapi.responses import JSONResponse
 import uvicorn
 
@@ -175,7 +175,7 @@ class MockLCUServer:
         @app.delete("/lol-lobby/v2/lobby")
         async def delete_lobby():
             await self.trigger_idle()
-            return JSONResponse(status_code=204, content=None)
+            return Response(status_code=204)
 
         @app.put("/lol-lobby/v2/lobby/members/localMember/position-preferences")
         async def set_position_preferences(body: Dict[str, Any]):
@@ -192,7 +192,7 @@ class MockLCUServer:
         @app.post("/lol-lobby/v2/lobby/matchmaking/search")
         async def start_queue():
             await self.trigger_queue()
-            return JSONResponse(status_code=204, content=None)
+            return Response(status_code=204)
 
         @app.delete("/lol-lobby/v2/lobby/matchmaking/search")
         async def cancel_queue():
@@ -200,7 +200,7 @@ class MockLCUServer:
                 await self.trigger_lobby(self.lobby.get("gameConfig", {}).get("queueId", 420))
             else:
                 await self.trigger_idle()
-            return JSONResponse(status_code=204, content=None)
+            return Response(status_code=204)
 
         # Ready Check
         @app.get("/lol-matchmaking/v1/ready-check")
@@ -215,7 +215,7 @@ class MockLCUServer:
                 self.ready_check["playerResponse"] = "Accepted"
                 self.ready_check["numAccepted"] = min(self.ready_check["totalPlayers"], self.ready_check["numAccepted"] + 1)
                 await self.broadcast_event("/lol-matchmaking/v1/ready-check", self.ready_check)
-            return JSONResponse(status_code=204, content=None)
+            return Response(status_code=204)
 
         @app.post("/lol-matchmaking/v1/ready-check/declined")
         async def decline_ready_check():
@@ -228,7 +228,7 @@ class MockLCUServer:
                     await self.trigger_lobby(self.lobby.get("gameConfig", {}).get("queueId", 420))
                 else:
                     await self.trigger_idle()
-            return JSONResponse(status_code=204, content=None)
+            return Response(status_code=204)
 
         # Champ Select
         @app.get("/lol-champ-select/v1/session")
@@ -271,7 +271,7 @@ class MockLCUServer:
                     break
 
             await self.broadcast_event("/lol-champ-select/v1/session", self.champ_select)
-            return JSONResponse(status_code=204, content=None)
+            return Response(status_code=204)
 
         @app.patch("/lol-champ-select/v1/session/my-selection")
         async def patch_my_selection(body: Dict[str, Any]):
@@ -299,7 +299,7 @@ class MockLCUServer:
                     if "spell2Id" in body:
                         m["spell2Id"] = body["spell2Id"]
             await self.broadcast_event("/lol-champ-select/v1/session", self.champ_select)
-            return JSONResponse(status_code=204, content=None)
+            return Response(status_code=204)
 
         # Metadata
         @app.get("/lol-game-queues/v1/queues")
