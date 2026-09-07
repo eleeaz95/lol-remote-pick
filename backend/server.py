@@ -1026,7 +1026,7 @@ def create_app(custom_settings: Optional[Settings] = None) -> FastAPI:
 
     app = FastAPI(
         title="LoL Remote Pick API",
-        version="0.7.0",
+        version="0.8.0",
         description="Remote controller and pick/ban API for League Client (LCU)",
         lifespan=lifespan,
     )
