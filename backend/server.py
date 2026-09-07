@@ -86,6 +86,32 @@ class MockPhaseRequest(BaseModel):
     partySize: int = Field(default=0, ge=0, le=5, description="Pad the simulated lobby to this many members")
 
 
+# The /ws gateway speaks the same endpoints the REST API does, so the frontend can prefer the
+# socket and fall back to REST without knowing two vocabularies. An endpoint missing from this table
+# silently does nothing over the socket, which is why it is a table rather than a chain of ifs.
+WS_ENDPOINT_ACTIONS = (
+    ("/api/matchmaking/accept", "ACCEPT_MATCH"),
+    ("/api/matchmaking/decline", "DECLINE_MATCH"),
+    ("/api/lobby/queue/start", "START_QUEUE"),
+    ("/api/lobby/queue/cancel", "CANCEL_QUEUE"),
+    ("/api/lobby/create", "CREATE_LOBBY"),
+    ("/api/lobby/positions", "SET_POSITIONS"),
+    ("/api/champ-select/action", "CHAMP_ACTION"),
+    ("/api/champ-select/hover", "CHAMP_HOVER"),
+    ("/api/champ-select/spells", "SET_SPELLS"),
+    ("/api/champ-select/bench-swap", "BENCH_SWAP"),
+    ("/api/state", "GET_STATE"),
+)
+
+
+def action_for_endpoint(endpoint: str) -> str:
+    """Translate a REST endpoint path into the action name the hub executes."""
+    for path, action in WS_ENDPOINT_ACTIONS:
+        if path in endpoint:
+            return action
+    return ""
+
+
 # ---------------------------------------------------------------------------
 # Network & QR Code Utilities
 # ---------------------------------------------------------------------------
@@ -1093,29 +1119,7 @@ def create_app(custom_settings: Optional[Settings] = None) -> FastAPI:
                 action = payload.get("action", payload.get("type", ""))
 
                 if not action and endpoint:
-                    # Map endpoint path to action name
-                    if "/api/matchmaking/accept" in endpoint:
-                        action = "ACCEPT_MATCH"
-                    elif "/api/matchmaking/decline" in endpoint:
-                        action = "DECLINE_MATCH"
-                    elif "/api/lobby/queue/start" in endpoint:
-                        action = "START_QUEUE"
-                    elif "/api/lobby/queue/cancel" in endpoint:
-                        action = "CANCEL_QUEUE"
-                    elif "/api/lobby/create" in endpoint:
-                        action = "CREATE_LOBBY"
-                    elif "/api/lobby/positions" in endpoint:
-                        action = "SET_POSITIONS"
-                    elif "/api/champ-select/action" in endpoint:
-                        action = "CHAMP_ACTION"
-                    elif "/api/champ-select/hover" in endpoint:
-                        action = "CHAMP_HOVER"
-                    elif "/api/champ-select/spells" in endpoint:
-                        action = "SET_SPELLS"
-                    elif "/api/champ-select/bench-swap" in endpoint:
-                        action = "BENCH_SWAP"
-                    elif "/api/state" in endpoint:
-                        action = "GET_STATE"
+                    action = action_for_endpoint(endpoint)
 
                 if action:
                     result = await hub.execute_action(action, payload)

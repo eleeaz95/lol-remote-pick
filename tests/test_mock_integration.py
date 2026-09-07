@@ -523,3 +523,14 @@ async def test_mock_lobby_can_be_filled_to_a_five_stack(mock_app_and_client):
 
     await client.post("/api/mock/phase", json={"phase": "lobby", "queueId": 440})
     assert (await client.get("/api/state")).json()["lobby"]["allowsSecondPosition"] is True
+
+
+@pytest.mark.asyncio
+async def test_websocket_gateway_knows_every_rest_endpoint():
+    """The socket is the frontend's first choice: an unmapped endpoint would do nothing at all."""
+    from backend.server import action_for_endpoint
+
+    assert action_for_endpoint("/api/lobby/positions") == "SET_POSITIONS"
+    assert action_for_endpoint("/api/champ-select/bench-swap") == "BENCH_SWAP"
+    assert action_for_endpoint("/api/matchmaking/accept") == "ACCEPT_MATCH"
+    assert action_for_endpoint("/api/unknown") == ""
