@@ -9,6 +9,32 @@ from .lcu_connector import LCUCredentials
 
 logger = logging.getLogger(__name__)
 
+POSITION_PREFERENCES = ("TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY", "FILL", "UNSELECTED")
+
+
+def normalize_position_pair(first: str, second: str) -> tuple[str, str]:
+    """Coerce a lane pair into a combination the client's own selector could have produced.
+
+    The selector never offers Fill next to a lane, nor the same lane twice, and the LCU accepts
+    such a pair over REST without complaining -- the lobby then reads back the lanes we sent while
+    matchmaking treats the preference as unset. Anything the selector could not have produced
+    collapses to a single preference with the second slot left UNSELECTED.
+    """
+
+    def clean(value: str) -> str:
+        text = str(value or "").strip().upper()
+        if text in ("", "NONE", "ANY"):
+            return "UNSELECTED"
+        return text if text in POSITION_PREFERENCES else "UNSELECTED"
+
+    first, second = clean(first), clean(second)
+    if first == "UNSELECTED":
+        # A lone secondary is really a primary; the client has no way to express the reverse.
+        first, second = second, "UNSELECTED"
+    if first in ("FILL", "UNSELECTED") or second in ("FILL", first):
+        second = "UNSELECTED"
+    return first, second
+
 
 class LCUClient:
     """Async REST API client for communicating with the local League Client."""
@@ -158,9 +184,10 @@ class LCUClient:
 
     async def set_position_preferences(self, first: str, second: str) -> Optional[Dict[str, Any]]:
         """Set lane/position preferences for local lobby member (e.g. 'TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'FILL')."""
+        first, second = normalize_position_pair(first, second)
         payload = {
-            "firstPreference": first.upper(),
-            "secondPreference": second.upper(),
+            "firstPreference": first,
+            "secondPreference": second,
         }
         res = await self.request("PUT", "/lol-lobby/v2/lobby/members/localMember/position-preferences", json=payload)
         if res and res.is_success:

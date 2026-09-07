@@ -696,3 +696,40 @@ async def test_card_pick_completes_the_action_instead_of_swapping():
     assert res2["success"] is True
     hub.lcu_client.bench_swap.assert_awaited_once_with(51)
     hub.lcu_client.patch_champ_select_action.assert_not_awaited()
+
+
+async def test_position_pair_matches_what_the_client_selector_can_produce():
+    """Fill beside a lane, or the same lane twice, is a pair the client displays but never queues."""
+    from backend.lcu_client import normalize_position_pair
+
+    # The pair that started this: the lobby read "Fill / Fill" while matchmaking had no preference
+    assert normalize_position_pair("FILL", "FILL") == ("FILL", "UNSELECTED")
+    assert normalize_position_pair("FILL", "TOP") == ("FILL", "UNSELECTED")
+    assert normalize_position_pair("TOP", "TOP") == ("TOP", "UNSELECTED")
+    assert normalize_position_pair("MIDDLE", "FILL") == ("MIDDLE", "UNSELECTED")
+
+    # A lone secondary is a primary; the client cannot express the reverse
+    assert normalize_position_pair("UNSELECTED", "BOTTOM") == ("BOTTOM", "UNSELECTED")
+    assert normalize_position_pair("", "") == ("UNSELECTED", "UNSELECTED")
+
+    # Anything the client would not recognise drops out rather than reaching the LCU
+    assert normalize_position_pair("mid", "support") == ("UNSELECTED", "UNSELECTED")
+    assert normalize_position_pair("middle", "utility") == ("MIDDLE", "UTILITY")
+
+
+async def test_set_position_preferences_sends_only_valid_pairs():
+    """The correction has to happen on the way out, not just in the phone's dropdowns."""
+    import httpx
+
+    sent: list[dict] = []
+
+    class _Recorder(LCUClient):
+        async def request(self, method, endpoint, **kwargs):
+            sent.append(kwargs.get("json", {}))
+            return httpx.Response(200, json={}, request=httpx.Request(method, "http://x" + endpoint))
+
+    await _Recorder().set_position_preferences("FILL", "FILL")
+    assert sent[-1] == {"firstPreference": "FILL", "secondPreference": "UNSELECTED"}
+
+    await _Recorder().set_position_preferences("jungle", "jungle")
+    assert sent[-1] == {"firstPreference": "JUNGLE", "secondPreference": "UNSELECTED"}

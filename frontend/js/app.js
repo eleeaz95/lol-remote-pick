@@ -29,6 +29,7 @@
       isLeader: true,
       canStartQueue: true,
       hasPositions: true,
+      allowsSecondPosition: true,
       members: [],
     },
     queue: {
@@ -119,6 +120,7 @@
     lastReadyCheckDisplayedSec: -1,
     queueStartMs: 0,
     lastQueueDisplayedSec: -1,
+    rolesChangedAtMs: 0,
   };
   // Default Fallback Catalogs
   const DEFAULT_SPELLS = [
@@ -809,6 +811,8 @@
         isLeader: payload.lobby.isLeader !== undefined ? payload.lobby.isLeader : true,
         canStartQueue: payload.lobby.canStartQueue !== undefined ? payload.lobby.canStartQueue : true,
         hasPositions: payload.lobby.hasPositions !== undefined ? Boolean(payload.lobby.hasPositions) : true,
+        allowsSecondPosition:
+          payload.lobby.allowsSecondPosition !== undefined ? Boolean(payload.lobby.allowsSecondPosition) : true,
         members: Array.isArray(payload.lobby.members) ? payload.lobby.members : [],
       };
     }
@@ -1166,16 +1170,110 @@
   }
 
   // 2. Lobby View
+  const NO_ROLE = 'UNSELECTED';
+
   function prettyRole(role) {
-    const value = String(role || 'FILL');
-    if (value === 'UNSELECTED' || value === '') return 'Fill';
+    const value = String(role || '').toUpperCase();
+    if (value === '' || value === NO_ROLE) return '';
     return value.charAt(0) + value.slice(1).toLowerCase();
+  }
+
+  function formatRolePair(first, second) {
+    // A member who has not chosen yet is not on Fill: the client leaves their lanes blank, and
+    // reading that as Fill is the same mistake that hid the bad pair in the first place. A lobby
+    // that takes no second preference shows one lane each, whatever the client still has on file
+    // from before the party filled up.
+    const primary = prettyRole(first);
+    const secondary = state.lobby.allowsSecondPosition === false ? '' : prettyRole(second);
+    if (!primary) return '—';
+    return secondary ? `${primary} / ${secondary}` : primary;
+  }
+
+  function roleBadge(role) {
+    const value = String(role || '').toUpperCase();
+    return value === '' || value === NO_ROLE ? '—' : value.substring(0, 3);
+  }
+
+  function hasOption(select, value) {
+    return Array.from(select.options).some((opt) => opt.value === value);
+  }
+
+  // The lane the client actually has on file, falling back to the dropdowns before a lobby exists.
+  function localRolePair() {
+    const local = state.lobby.members.find((m) => m.isLocalMember);
+    if (local) {
+      return {
+        first: String(local.firstPositionPreference || '').toUpperCase(),
+        second:
+          state.lobby.allowsSecondPosition === false
+            ? NO_ROLE
+            : String(local.secondPositionPreference || '').toUpperCase(),
+      };
+    }
+    return {
+      first: (document.getElementById('select-role-primary')?.value || 'MIDDLE').toUpperCase(),
+      second: (document.getElementById('select-role-secondary')?.value || NO_ROLE).toUpperCase(),
+    };
+  }
+
+  // The client's own selector cannot express Fill beside a lane, the same lane twice, or a second
+  // preference in a five-stack. It takes those pairs over the API and then ignores them at
+  // matchmaking, which is what left the phone reading "Fill / Fill" over a lobby that had neither.
+  function applyRoleConstraints() {
+    const selectP = document.getElementById('select-role-primary');
+    const selectS = document.getElementById('select-role-secondary');
+    if (!selectP || !selectS) return null;
+
+    const allowsSecond = state.lobby.allowsSecondPosition !== false;
+    const first = selectP.value.toUpperCase();
+    const locked = !allowsSecond || first === 'FILL';
+    if (locked || selectS.value.toUpperCase() === first) {
+      selectS.value = NO_ROLE;
+    }
+    selectS.disabled = locked;
+
+    const block = selectS.closest('.role-selector-block');
+    if (block) block.classList.toggle('role-block-locked', locked);
+
+    const hint = document.getElementById('secondary-role-hint');
+    if (hint) {
+      hint.textContent = !allowsSecond
+        ? 'A full party takes one lane each'
+        : first === 'FILL'
+          ? 'Fill already covers every lane'
+          : '';
+    }
+
+    const pIcon = document.getElementById('primary-role-icon');
+    const sIcon = document.getElementById('secondary-role-icon');
+    if (pIcon) pIcon.textContent = roleBadge(first);
+    if (sIcon) sIcon.textContent = roleBadge(selectS.value);
+
+    return { first, second: selectS.value.toUpperCase() };
+  }
+
+  // The dropdowns are a mirror, not the source: a preference set on the PC client, or corrected on
+  // the way out, has to land back on them. A change made here holds for a moment so an in-flight
+  // snapshot cannot bounce the control back under the player's thumb.
+  function syncRoleSelectsFromLobby() {
+    if (Date.now() - localState.rolesChangedAtMs < 2000) return;
+    const local = state.lobby.members.find((m) => m.isLocalMember);
+    const selectP = document.getElementById('select-role-primary');
+    const selectS = document.getElementById('select-role-secondary');
+    if (!local || !selectP || !selectS) return;
+
+    const first = String(local.firstPositionPreference || '').toUpperCase();
+    const second = String(local.secondPositionPreference || '').toUpperCase();
+    if (hasOption(selectP, first)) selectP.value = first;
+    if (hasOption(selectS, second)) selectS.value = second;
   }
 
   function renderLobbyView() {
     // Modes that assign champions at random have no lanes to prefer. The control is not
     // disabled but removed: nothing the player could do here would ever make it apply.
     toggleElementById('position-card', state.lobby.hasPositions !== false);
+    syncRoleSelectsFromLobby();
+    applyRoleConstraints();
 
     // Queue button active state
     document.querySelectorAll('.queue-btn').forEach((btn) => {
@@ -1201,7 +1299,7 @@
                 profileIconId: state.summoner.profileIconId || 29,
                 isLeader: true,
                 firstPositionPreference: document.getElementById('select-role-primary')?.value || 'MIDDLE',
-                secondPositionPreference: document.getElementById('select-role-secondary')?.value || 'BOTTOM',
+                secondPositionPreference: document.getElementById('select-role-secondary')?.value || NO_ROLE,
               },
             ];
 
@@ -1220,7 +1318,7 @@
             state.lobby.hasPositions === false
               ? ''
               : `<div class="member-roles">
-            <span>${escapeHtml(prettyRole(m.firstPositionPreference))} / ${escapeHtml(prettyRole(m.secondPositionPreference))}</span>
+            <span>${escapeHtml(formatRolePair(m.firstPositionPreference, m.secondPositionPreference))}</span>
           </div>`
           }
         `;
@@ -1247,12 +1345,16 @@
     const queueName = document.getElementById('queue-current-name');
     if (queueName) queueName.textContent = state.lobby.queueName || 'Ranked Solo/Duo';
 
-    const pRole = document.getElementById('select-role-primary')?.value || 'MID';
-    const sRole = document.getElementById('select-role-secondary')?.value || 'BOT';
+    const roles = localRolePair();
     const pBadge = document.getElementById('queue-pos-primary');
     const sBadge = document.getElementById('queue-pos-secondary');
-    if (pBadge) pBadge.textContent = pRole.substring(0, 3);
-    if (sBadge) sBadge.textContent = sRole.substring(0, 3);
+    const separator = document.getElementById('queue-pos-separator');
+    if (pBadge) pBadge.textContent = roleBadge(roles.first);
+    if (sBadge) sBadge.textContent = roleBadge(roles.second);
+    // With no fallback lane there is nothing to separate: one badge, not "MID / —".
+    const hasSecond = roles.second !== '' && roles.second !== NO_ROLE;
+    toggleElementById('queue-pos-secondary', hasSecond);
+    if (separator) separator.classList.toggle('hidden', !hasSecond);
 
     updateQueueTimerDisplay();
   }
@@ -2238,18 +2340,17 @@
     // Role Selectors
     const selectP = document.getElementById('select-role-primary');
     const selectS = document.getElementById('select-role-secondary');
-    const pIcon = document.getElementById('primary-role-icon');
-    const sIcon = document.getElementById('secondary-role-icon');
 
     if (selectP && selectS) {
       const onRoleChange = () => {
         if (state.lobby.hasPositions === false) return;
 
-        if (pIcon) pIcon.textContent = selectP.value.substring(0, 3);
-        if (sIcon) sIcon.textContent = selectS.value.substring(0, 3);
+        const roles = applyRoleConstraints();
+        if (!roles) return;
+        localState.rolesChangedAtMs = Date.now();
         sendApiRequest('/api/lobby/positions', {
-          first: selectP.value,
-          second: selectS.value,
+          first: roles.first,
+          second: roles.second,
         });
       };
       selectP.addEventListener('change', onRoleChange);

@@ -37,7 +37,7 @@ from .champ_data import (
     init_champ_data,
 )
 from .config import Settings, get_settings
-from .lcu_client import LCUClient
+from .lcu_client import LCUClient, normalize_position_pair
 from .lcu_connector import LCUConnector
 from .lcu_ws import LCUWebSocket
 from .mock_lcu import MockLCUServer
@@ -56,7 +56,7 @@ class CreateLobbyRequest(BaseModel):
 
 class PositionPreferencesRequest(BaseModel):
     first: str = Field(..., description="First lane preference (TOP, JUNGLE, MIDDLE, BOTTOM, UTILITY, FILL)")
-    second: str = Field(default="FILL", description="Second lane preference")
+    second: str = Field(default="UNSELECTED", description="Second lane preference, UNSELECTED when there is none")
 
 
 class ChampSelectActionRequest(BaseModel):
@@ -83,6 +83,7 @@ class ChampSelectBenchSwapRequest(BaseModel):
 class MockPhaseRequest(BaseModel):
     phase: str = Field(..., description="Phase name (None, Lobby, Matchmaking, ReadyCheck, ChampSelect, InProgress)")
     queueId: Optional[int] = Field(default=420, description="Queue ID for lobby simulation")
+    partySize: int = Field(default=0, ge=0, le=5, description="Pad the simulated lobby to this many members")
 
 
 # ---------------------------------------------------------------------------
@@ -711,8 +712,12 @@ class AppHub:
                 }
 
             elif action in ("SET_POSITIONS", "SET_POSITION_PREFERENCES", "LOBBY_POSITIONS"):
-                first = str(payload.get("first", payload.get("firstPreference", "FILL")))
-                second = str(payload.get("second", payload.get("secondPreference", "FILL")))
+                # Normalized here as well as in the client so the reply names the pair that was
+                # really applied -- the phone echoes it back into the selectors.
+                first, second = normalize_position_pair(
+                    str(payload.get("first", payload.get("firstPreference", "FILL"))),
+                    str(payload.get("second", payload.get("secondPreference", "UNSELECTED"))),
+                )
                 res = await self.lcu_client.set_position_preferences(first, second)
                 return {"success": res is not None, "action": action, "first": first, "second": second}
 
@@ -802,7 +807,7 @@ class AppHub:
                 phase = str(payload.get("phase", "Lobby"))
                 qid = int(payload.get("queueId", 420))
                 if phase.lower() == "lobby":
-                    await self.mock_server.trigger_lobby(queue_id=qid)
+                    await self.mock_server.trigger_lobby(queue_id=qid, party_size=int(payload.get("partySize", 0)))
                 elif phase.lower() in ("in_queue", "matchmaking", "queue"):
                     await self.mock_server.trigger_queue()
                 elif phase.lower() in ("ready_check", "readycheck"):

@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260906_18">
+  <link rel="stylesheet" href="css/style.css?v=20260906_19">
 </head>
 <body class="hextech-theme">
   <div id="app" class="app-container">
@@ -141,10 +141,11 @@
                     <option value="MIDDLE">Middle</option>
                     <option value="BOTTOM" selected>Bottom</option>
                     <option value="UTILITY">Support</option>
-                    <option value="FILL">Fill</option>
+                    <option value="UNSELECTED">None</option>
                   </select>
                   <div class="select-icon-preview" id="secondary-role-icon">BOT</div>
                 </div>
+                <span id="secondary-role-hint" class="role-hint"></span>
               </div>
             </div>
           </div>
@@ -192,7 +193,7 @@
             <h3 id="queue-current-name" class="queue-name-banner">Ranked Solo/Duo</h3>
             <div class="queue-positions-summary">
               <span id="queue-pos-primary" class="badge-role">MID</span>
-              <span class="role-separator">/</span>
+              <span id="queue-pos-separator" class="role-separator">/</span>
               <span id="queue-pos-secondary" class="badge-role">BOT</span>
             </div>
           </div>
@@ -508,6 +509,6 @@
     <div id="toast-container" class="toast-container"></div>
   </div>
 
-  <script src="js/app.js?v=20260906_18"></script>
+  <script src="js/app.js?v=20260906_19"></script>
 </body>
 </html>

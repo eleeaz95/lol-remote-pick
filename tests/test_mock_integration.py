@@ -495,3 +495,31 @@ async def test_party_member_names_are_resolved_by_puuid(mock_app_and_client):
     assert members[1]["isLocalMember"] is False
     assert members[1]["summonerName"] == "MockDuo#LAS", "the party member never got named"
     assert members[1]["profileIconId"] == 4567
+
+
+@pytest.mark.asyncio
+async def test_lobby_positions_reach_the_client_as_a_pair_it_accepts(mock_app_and_client):
+    """Fill sent alongside a lane arrives as Fill alone, the way the client's selector sends it."""
+    app, client, hub = mock_app_and_client
+
+    await client.post("/api/lobby/create", json={"queueId": 440})
+    res = await client.post("/api/lobby/positions", json={"first": "FILL", "second": "FILL"})
+    assert res.json()["second"] == "UNSELECTED"
+
+    local = (await client.get("/api/state")).json()["lobby"]["members"][0]
+    assert local["firstPositionPreference"] == "FILL"
+    assert local["secondPositionPreference"] == "UNSELECTED"
+
+
+@pytest.mark.asyncio
+async def test_mock_lobby_can_be_filled_to_a_five_stack(mock_app_and_client):
+    """The party-size knob exists so the full-party case can be driven without four friends."""
+    app, client, hub = mock_app_and_client
+
+    await client.post("/api/mock/phase", json={"phase": "lobby", "queueId": 440, "partySize": 5})
+    lobby = (await client.get("/api/state")).json()["lobby"]
+    assert len(lobby["members"]) == 5
+    assert lobby["allowsSecondPosition"] is False
+
+    await client.post("/api/mock/phase", json={"phase": "lobby", "queueId": 440})
+    assert (await client.get("/api/state")).json()["lobby"]["allowsSecondPosition"] is True

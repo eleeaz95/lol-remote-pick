@@ -482,8 +482,12 @@ class MockLCUServer:
         await self.broadcast_event("/lol-matchmaking/v1/ready-check", None, event_type="Delete")
         await self.broadcast_event("/lol-champ-select/v1/session", None, event_type="Delete")
 
-    async def trigger_lobby(self, queue_id: int = 420) -> None:
-        """Transition to LOBBY state."""
+    async def trigger_lobby(self, queue_id: int = 420, party_size: int = 0) -> None:
+        """Transition to LOBBY state.
+
+        `party_size` pads the party with stand-in premades, so cases that only appear at a certain
+        size -- a five-stack takes one lane each, with no second preference -- can be driven here.
+        """
         self.gameflow_phase = "Lobby"
         self.queue_search = None
         self.ready_check = None
@@ -534,6 +538,24 @@ class MockLCUServer:
                 ],
             ],
         }
+
+        members = self.lobby["members"]
+        while party_size and len(members) < party_size:
+            index = len(members)
+            members.append(
+                {
+                    "summonerId": 200000100 + index,
+                    "puuid": f"mock-puuid-premade-{index}",
+                    "summonerName": "",
+                    "summonerIconId": 29,
+                    "summonerLevel": 30,
+                    "isLeader": False,
+                    "firstPositionPreference": "UNSELECTED",
+                    "secondPositionPreference": "UNSELECTED",
+                }
+            )
+        if party_size:
+            del members[max(1, party_size) :]
 
         await self.broadcast_event("/lol-gameflow/v1/gameflow-phase", "Lobby")
         await self.broadcast_event("/lol-lobby/v2/lobby", self.lobby)

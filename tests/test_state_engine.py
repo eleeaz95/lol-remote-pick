@@ -891,3 +891,30 @@ async def test_state_engine_member_names_fill_in_from_lookup():
     members = engine.get_state()["lobby"]["members"]
     assert members[0]["summonerName"] == "Eleeaz#LAS"
     assert members[1]["summonerName"] == "Duo#LAS"
+
+
+async def test_state_engine_lobby_drops_the_second_position_in_a_full_party():
+    """Five people share five lanes: the client asks each for one position, not a fallback."""
+    engine = StateEngine()
+    engine.set_connected(True)
+
+    def party_of(size: int) -> dict:
+        return {
+            "gameConfig": {"queueId": 440},
+            "members": [{"summonerId": i, "firstPositionPreference": "UNSELECTED"} for i in range(size)],
+        }
+
+    await engine.handle_lcu_event("/lol-lobby/v2/lobby", party_of(4))
+    assert engine.get_state()["lobby"]["allowsSecondPosition"] is True
+
+    await engine.handle_lcu_event("/lol-lobby/v2/lobby", party_of(5))
+    assert engine.get_state()["lobby"]["allowsSecondPosition"] is False
+
+    # No lanes at all means no second lane either
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/lobby",
+        {"gameConfig": {"queueId": 450}, "members": [{"summonerId": 1}]},
+    )
+    lobby = engine.get_state()["lobby"]
+    assert lobby["hasPositions"] is False
+    assert lobby["allowsSecondPosition"] is False

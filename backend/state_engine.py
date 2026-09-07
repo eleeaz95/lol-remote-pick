@@ -41,6 +41,10 @@ QUEUE_NAMES = {
 # Queues whose champion select uses random assignment + shared bench instead of pick/ban draft
 BENCH_QUEUE_IDS = {450, 720, 721, 2400, 2450, 3220, 3270, 3280}
 
+# Party size at which the client stops taking a second lane preference: with every lane spoken for,
+# each member states one position instead of a first and a fallback.
+FULL_PREMADE_SIZE = 5
+
 
 def _extract_bench(session: Dict[str, Any], dealt_cards: Optional[List[int]] = None) -> List[Dict[str, Any]]:
     """Normalize the shared champion bench, accepting object or plain-id LCU payloads.
@@ -537,6 +541,7 @@ class StateEngine:
                 "isLeader": False,
                 "canStartQueue": False,
                 "hasPositions": True,
+                "allowsSecondPosition": True,
                 "members": [],
             }
 
@@ -603,12 +608,17 @@ class StateEngine:
             queue_meta = get_queue_by_id(queue_id) or {}
             has_positions = bool(queue_meta.get("hasPositions", True)) and queue_id not in BENCH_QUEUE_IDS
 
+        # A full premade takes one lane each: the client drops the secondary selector at five, and a
+        # second preference sent from a five-stack is discarded rather than rejected.
+        allows_second_position = has_positions and len(members_normalized) < FULL_PREMADE_SIZE
+
         return {
             "queueId": queue_id,
             "queueName": queue_name,
             "isLeader": is_local_leader,
             "canStartQueue": can_start,
             "hasPositions": has_positions,
+            "allowsSecondPosition": allows_second_position,
             "members": members_normalized,
         }
 
