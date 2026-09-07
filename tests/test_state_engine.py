@@ -949,3 +949,65 @@ async def test_state_engine_reports_ban_slots_per_team():
         },
     )
     assert engine.get_state()["champSelect"]["bans"]["bansPerTeam"] == 1
+
+
+async def test_state_engine_keeps_only_invitations_still_waiting():
+    """The client leaves answered invitations in the same list; only Pending ones can be joined."""
+    engine = StateEngine()
+    engine.set_connected(True)
+
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/received-invitations",
+        [
+            {
+                "invitationId": "inv-1",
+                "state": "Pending",
+                "fromSummonerName": "",
+                "fromSummonerId": 42,
+                "canAcceptInvitation": True,
+                "gameConfig": {"queueId": 440},
+            },
+            {"invitationId": "inv-2", "state": "Declined", "gameConfig": {"queueId": 420}},
+            {"invitationId": "inv-3", "state": "Accepted", "gameConfig": {"queueId": 450}},
+        ],
+    )
+
+    invitations = engine.get_state()["invitations"]
+    assert [inv["id"] for inv in invitations] == ["inv-1"]
+    assert invitations[0]["queueName"] == "Ranked Flex 5v5"
+    assert invitations[0]["canAccept"] is True
+
+    # The sender is nameless until the profile lookup lands, exactly like a lobby member
+    assert invitations[0]["fromSummonerName"] == ""
+    engine.set_invitation_senders({"inv-1": {"name": "Rakan#LAS", "profileIconId": 4567}})
+    resolved = engine.get_state()["invitations"][0]
+    assert resolved["fromSummonerName"] == "Rakan#LAS"
+    assert resolved["profileIconId"] == 4567
+
+    # A name resolved for an invitation that is gone must not stick to the next one
+    await engine.handle_lcu_event("/lol-lobby/v2/received-invitations", [])
+    assert engine.get_state()["invitations"] == []
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/received-invitations",
+        [{"invitationId": "inv-1", "state": "Pending", "gameConfig": {"queueId": 440}}],
+    )
+    assert engine.get_state()["invitations"][0]["fromSummonerName"] == ""
+
+
+async def test_state_engine_reports_invitations_that_cannot_be_accepted():
+    """During a game the client refuses party changes, and the phone has to show that."""
+    engine = StateEngine()
+    engine.set_connected(True)
+
+    await engine.handle_lcu_event(
+        "/lol-lobby/v2/received-invitations",
+        [
+            {
+                "invitationId": "inv-1",
+                "state": "Pending",
+                "canAcceptInvitation": False,
+                "gameConfig": {"queueId": 450},
+            }
+        ],
+    )
+    assert engine.get_state()["invitations"][0]["canAccept"] is False

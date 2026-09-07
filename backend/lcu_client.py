@@ -204,6 +204,43 @@ class LCUClient:
         res = await self.request("DELETE", "/lol-lobby/v2/lobby/matchmaking/search")
         return bool(res and res.is_success)
 
+    # --- Received Invitations ---
+
+    async def get_received_invitations(self) -> Optional[List[Dict[str, Any]]]:
+        """Fetch the invitations other players have sent to this client.
+
+        The list keeps answered invitations around with a state of Accepted, Declined or Kicked;
+        only the Pending ones are still actionable.
+        """
+        res = await self.request("GET", "/lol-lobby/v2/received-invitations")
+        if res and res.status_code == 200:
+            data = res.json()
+            return data if isinstance(data, list) else []
+        return None
+
+    async def accept_invitation(self, invitation_id: str) -> bool:
+        """Join the party behind an invitation, which leaves the current lobby if there is one."""
+        if not invitation_id:
+            return False
+        res = await self.request("POST", f"/lol-lobby/v2/received-invitations/{invitation_id}/accept")
+        return bool(res and res.is_success)
+
+    async def decline_invitation(self, invitation_id: str) -> bool:
+        """Turn down an invitation."""
+        if not invitation_id:
+            return False
+        res = await self.request("POST", f"/lol-lobby/v2/received-invitations/{invitation_id}/decline")
+        return bool(res and res.is_success)
+
+    async def get_summoner_by_id(self, summoner_id: int) -> Optional[Dict[str, Any]]:
+        """Look up a profile by summoner id, the only handle an invitation carries for the sender."""
+        if not summoner_id:
+            return None
+        res = await self.request("GET", f"/lol-summoner/v1/summoners/{summoner_id}")
+        if res and res.status_code == 200:
+            return res.json()
+        return None
+
     # --- Ready Check (Match Acceptance) ---
 
     async def get_ready_check(self) -> Optional[Dict[str, Any]]:

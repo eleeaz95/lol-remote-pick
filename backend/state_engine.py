@@ -112,6 +112,8 @@ class StateEngine:
         self._raw_lobby: Optional[Dict[str, Any]] = None
         self._member_names: Dict[str, str] = {}
         self._raw_queue: Optional[Dict[str, Any]] = None
+        self._raw_invitations: List[Dict[str, Any]] = []
+        self._invitation_senders: Dict[str, Dict[str, Any]] = {}
         self._raw_ready_check: Optional[Dict[str, Any]] = None
         self._ready_check_started_at: Optional[float] = None
         self._raw_champ_select: Optional[Dict[str, Any]] = None
@@ -267,6 +269,10 @@ class StateEngine:
                     if qname:
                         self._active_queue_name = str(qname)
                 state_changed = True
+            elif "/lol-lobby/v2/received-invitations" in uri:
+                self._set_invitations([] if event_type == "Delete" else data)
+                state_changed = True
+
             elif (
                 "/lol-matchmaking/v1/search" in uri
                 or "matchmaking/search" in uri
@@ -349,6 +355,29 @@ class StateEngine:
         self._cached_state = None
         asyncio.create_task(self._emit_state_change())
 
+    def set_invitation_senders(self, senders: Dict[str, Dict[str, Any]]) -> None:
+        """Attach sender profiles resolved per invitation, keyed by invitation id.
+
+        Invitations carry the same empty summonerName lobby members do, so whoever sent one can
+        only be named through a profile lookup, the way set_member_names handles the party. The
+        profile icon rides along because that same lookup is what has it.
+        """
+        fresh = {str(inv_id): profile for inv_id, profile in (senders or {}).items() if inv_id and profile}
+        if not fresh or all(self._invitation_senders.get(k) == v for k, v in fresh.items()):
+            return
+
+        self._invitation_senders.update(fresh)
+        self._cached_state = None
+        asyncio.create_task(self._emit_state_change())
+
+    def _set_invitations(self, invitations: Any) -> None:
+        """Store the raw invitation list, forgetting names for invitations that are gone."""
+        self._raw_invitations = (
+            [inv for inv in invitations if isinstance(inv, dict)] if isinstance(invitations, list) else []
+        )
+        live_ids = {str(inv.get("invitationId") or "") for inv in self._raw_invitations}
+        self._invitation_senders = {k: v for k, v in self._invitation_senders.items() if k in live_ids}
+
     def set_subset_champion_ids(self, champion_ids: List[Any]) -> None:
         """Attach the pickable card list, which only the REST endpoint exposes.
 
@@ -383,6 +412,7 @@ class StateEngine:
         ready_check: Optional[Dict[str, Any]] = None,
         champ_select: Optional[Dict[str, Any]] = None,
         gameflow_session: Optional[Dict[str, Any]] = None,
+        invitations: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         """Synchronize state from periodic HTTP polling."""
         if summoner is not None:
@@ -394,6 +424,8 @@ class StateEngine:
                 self._active_queue_id = 0
                 self._active_game_mode = ""
                 self._active_queue_name = ""
+        if invitations is not None:
+            self._set_invitations(invitations)
         if lobby is not None:
             if self._lobby_delete_task and not self._lobby_delete_task.done():
                 self._lobby_delete_task.cancel()
@@ -473,6 +505,9 @@ class StateEngine:
             "readyCheck": ready_check,
             "champSelect": champ_select,
             "inGame": self._normalize_in_game(),
+            # Not a phase: invitations arrive while idle, in a lobby or in queue, and several can
+            # be pending at once, so they ride alongside the phase state rather than replacing it.
+            "invitations": self._normalize_invitations(),
         }
 
         self._cached_state = state
@@ -621,6 +656,46 @@ class StateEngine:
             "allowsSecondPosition": allows_second_position,
             "members": members_normalized,
         }
+
+    def _normalize_invitations(self) -> List[Dict[str, Any]]:
+        """Normalize the invitations that are still waiting for an answer.
+
+        The client keeps answered invitations in the same list, so anything that is not Pending is
+        dropped rather than shown as something the player could still join.
+        """
+        invitations = []
+        for inv in self._raw_invitations:
+            if str(inv.get("state") or "").lower() != "pending":
+                continue
+
+            invitation_id = str(inv.get("invitationId") or "")
+            if not invitation_id:
+                continue
+
+            game_config = inv.get("gameConfig") or {}
+            try:
+                queue_id = int(game_config.get("queueId") or 0)
+            except (ValueError, TypeError):
+                queue_id = 0
+
+            sender = self._invitation_senders.get(invitation_id, {})
+            name = inv.get("fromSummonerName") or sender.get("name", "")
+            icon_id = inv.get("fromSummonerIconId") or sender.get("profileIconId") or 0
+
+            invitations.append(
+                {
+                    "id": invitation_id,
+                    "fromSummonerName": name,
+                    "fromSummonerId": inv.get("fromSummonerId", 0),
+                    "profileIconId": icon_id,
+                    "queueId": queue_id,
+                    "queueName": QUEUE_NAMES.get(queue_id, f"Queue {queue_id}" if queue_id else "Custom game"),
+                    # False while the client is busy in champ select or a game, where joining a
+                    # different party is refused. The phone shows the invitation either way.
+                    "canAccept": bool(inv.get("canAcceptInvitation", True)),
+                }
+            )
+        return invitations
 
     def _normalize_queue(self) -> Dict[str, Any]:
         """Normalize matchmaking queue timer."""

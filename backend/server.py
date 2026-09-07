@@ -59,6 +59,10 @@ class PositionPreferencesRequest(BaseModel):
     second: str = Field(default="UNSELECTED", description="Second lane preference, UNSELECTED when there is none")
 
 
+class InvitationRequest(BaseModel):
+    invitationId: str = Field(..., description="Id of the received invitation to answer")
+
+
 class ChampSelectActionRequest(BaseModel):
     actionId: int = Field(..., description="Action ID in champ select session")
     championId: int = Field(..., description="Champion ID to pick or ban")
@@ -80,6 +84,11 @@ class ChampSelectBenchSwapRequest(BaseModel):
     championId: int = Field(..., description="Champion ID from the shared bench to swap into")
 
 
+class MockInviteRequest(BaseModel):
+    queueId: int = Field(default=440, description="Queue the simulated invitation is for")
+    fromSummonerName: str = Field(default="", description="Sender name; empty mimics the real client")
+
+
 class MockPhaseRequest(BaseModel):
     phase: str = Field(..., description="Phase name (None, Lobby, Matchmaking, ReadyCheck, ChampSelect, InProgress)")
     queueId: Optional[int] = Field(default=420, description="Queue ID for lobby simulation")
@@ -96,6 +105,8 @@ WS_ENDPOINT_ACTIONS = (
     ("/api/lobby/queue/cancel", "CANCEL_QUEUE"),
     ("/api/lobby/create", "CREATE_LOBBY"),
     ("/api/lobby/positions", "SET_POSITIONS"),
+    ("/api/lobby/invitations/accept", "ACCEPT_INVITATION"),
+    ("/api/lobby/invitations/decline", "DECLINE_INVITATION"),
     ("/api/champ-select/action", "CHAMP_ACTION"),
     ("/api/champ-select/hover", "CHAMP_HOVER"),
     ("/api/champ-select/spells", "SET_SPELLS"),
@@ -362,6 +373,8 @@ class AppHub:
         self._subset_last_try = 0.0
         self._resolved_member_names: Dict[str, str] = {}
         self._member_names_task: Optional[asyncio.Task] = None
+        self._resolved_invitation_senders: Dict[str, Dict[str, Any]] = {}
+        self._invitation_senders_task: Optional[asyncio.Task] = None
         self._subset_task: Optional[asyncio.Task] = None
         self._is_running = False
         self._last_broadcast_payload: Optional[Dict[str, Any]] = None
@@ -484,6 +497,76 @@ class AppHub:
             return
         self._member_names_task = asyncio.create_task(self._resolve_member_names(data))
 
+    async def _fetch_invitation_senders(self, uri: str, data: Any, event_type: str = "Update") -> None:
+        """Resolve invitation sender names whenever the invitation list changes.
+
+        Runs beside the event stream for the same reason the party lookups do: a name must not
+        delay the invitation itself reaching the phone.
+        """
+        if "/lol-lobby/v2/received-invitations" not in uri:
+            return
+        if event_type == "Delete":
+            self._resolved_invitation_senders.clear()
+            return
+        if self._invitation_senders_task and not self._invitation_senders_task.done():
+            return
+        self._invitation_senders_task = asyncio.create_task(self._resolve_invitation_senders(data))
+
+    def _find_invitation(self, invitation_id: str) -> Optional[Dict[str, Any]]:
+        """Look up a still-pending invitation in the current snapshot."""
+        if not invitation_id:
+            return None
+        for invitation in self.state_engine.get_state().get("invitations") or []:
+            if invitation.get("id") == invitation_id:
+                return invitation
+        return None
+
+    async def _resolve_invitation_senders(self, invitations: Optional[List[Dict[str, Any]]]) -> None:
+        """Name whoever sent each invitation, which takes one lookup per sender.
+
+        Invitations arrive with an empty summonerName for the same reason lobby members do, and the
+        sender is only identified by id, so the profile has to be fetched to show a Riot ID. That
+        profile also carries the icon the card shows.
+        """
+        if not isinstance(invitations, list):
+            return
+
+        resolved: Dict[str, Dict[str, Any]] = {}
+        for invitation in invitations:
+            if not isinstance(invitation, dict):
+                continue
+            if str(invitation.get("state") or "").lower() != "pending":
+                continue
+            if invitation.get("fromSummonerName"):
+                continue
+
+            invitation_id = str(invitation.get("invitationId") or "")
+            if not invitation_id or invitation_id in self._resolved_invitation_senders:
+                continue
+
+            puuid = str(invitation.get("fromSummonerPuuid") or invitation.get("fromPuuid") or "")
+            profile = await self.lcu_client.get_summoner_by_puuid(puuid) if puuid else None
+            if not profile:
+                try:
+                    summoner_id = int(invitation.get("fromSummonerId") or 0)
+                except (ValueError, TypeError):
+                    summoner_id = 0
+                profile = await self.lcu_client.get_summoner_by_id(summoner_id)
+            if not profile:
+                continue
+
+            name = profile.get("displayName") or profile.get("gameName") or ""
+            tag_line = profile.get("tagLine")
+            if name and tag_line and "#" not in name:
+                name = f"{name}#{tag_line}"
+            if name:
+                sender = {"name": name, "profileIconId": profile.get("profileIconId", 0) or 0}
+                self._resolved_invitation_senders[invitation_id] = sender
+                resolved[invitation_id] = sender
+
+        if resolved:
+            self.state_engine.set_invitation_senders(resolved)
+
     async def _on_state_engine_change(self, state: Dict[str, Any]) -> None:
         """Callback registered with StateEngine."""
         await self.broadcast_state(state)
@@ -521,12 +604,14 @@ class AppHub:
                                 ready_check = await self.lcu_client.get_ready_check()
                                 champ_select = await self.lcu_client.get_champ_select_session()
                                 gameflow_session = await self.lcu_client.get_gameflow_session()
+                                invitations = await self.lcu_client.get_received_invitations()
                                 if champ_select is not None and champ_select.get("allowSubsetChampionPicks"):
                                     subset = await self.lcu_client.get_subset_champion_list()
                                     if subset:
                                         champ_select["subsetChampionIds"] = subset
 
                                 await self._resolve_member_names(lobby)
+                                await self._resolve_invitation_senders(invitations)
 
                                 self.state_engine.update_from_poll(
                                     phase=phase,
@@ -535,6 +620,7 @@ class AppHub:
                                     ready_check=ready_check,
                                     champ_select=champ_select,
                                     gameflow_session=gameflow_session,
+                                    invitations=invitations,
                                 )
                                 self.state_engine.set_connected(True)
                         elif self.lcu_ws.is_connected:
@@ -562,12 +648,14 @@ class AppHub:
                                 ready_check = await self.lcu_client.get_ready_check()
                                 champ_select = await self.lcu_client.get_champ_select_session()
                                 gameflow_session = await self.lcu_client.get_gameflow_session()
+                                invitations = await self.lcu_client.get_received_invitations()
                                 if champ_select is not None and champ_select.get("allowSubsetChampionPicks"):
                                     subset = await self.lcu_client.get_subset_champion_list()
                                     if subset:
                                         champ_select["subsetChampionIds"] = subset
 
                                 await self._resolve_member_names(lobby)
+                                await self._resolve_invitation_senders(invitations)
 
                                 self.state_engine.update_from_poll(
                                     phase=phase,
@@ -576,6 +664,7 @@ class AppHub:
                                     ready_check=ready_check,
                                     champ_select=champ_select,
                                     gameflow_session=gameflow_session,
+                                    invitations=invitations,
                                 )
                                 self.state_engine.set_connected(True)
                             else:
@@ -630,6 +719,7 @@ class AppHub:
             self.lcu_ws.subscribe(self.state_engine.handle_lcu_event)
             self.lcu_ws.subscribe(self._fetch_subset_champions)
             self.lcu_ws.subscribe(self._fetch_lobby_member_names)
+            self.lcu_ws.subscribe(self._fetch_invitation_senders)
             self.lcu_ws.subscribe_connection(self._on_lcu_ws_connection)
             await self.lcu_ws.start()
 
@@ -646,6 +736,7 @@ class AppHub:
             self.lcu_ws.subscribe(self.state_engine.handle_lcu_event)
             self.lcu_ws.subscribe(self._fetch_subset_champions)
             self.lcu_ws.subscribe(self._fetch_lobby_member_names)
+            self.lcu_ws.subscribe(self._fetch_invitation_senders)
             self.lcu_ws.subscribe_connection(self._on_lcu_ws_connection)
             await self.lcu_ws.start()
 
@@ -670,7 +761,7 @@ class AppHub:
                 pass
         self.background_tasks.clear()
 
-        for task in (self._member_names_task, self._subset_task):
+        for task in (self._member_names_task, self._invitation_senders_task, self._subset_task):
             if task and not task.done():
                 task.cancel()
 
@@ -746,6 +837,29 @@ class AppHub:
                 )
                 res = await self.lcu_client.set_position_preferences(first, second)
                 return {"success": res is not None, "action": action, "first": first, "second": second}
+
+            elif action in ("ACCEPT_INVITATION", "ACCEPT_INVITE", "JOIN_INVITATION"):
+                invitation_id = str(payload.get("invitationId", payload.get("id", "")))
+                invitation = self._find_invitation(invitation_id)
+                if invitation is None:
+                    return {"success": False, "action": action, "error": "That invitation is no longer waiting"}
+                if not invitation.get("canAccept", True):
+                    # The client refuses to move you between parties mid game; say so instead of
+                    # firing a request it is going to turn down.
+                    return {
+                        "success": False,
+                        "action": action,
+                        "error": "You cannot join another party until this game is over",
+                    }
+                success = await self.lcu_client.accept_invitation(invitation_id)
+                return {"success": success, "action": action, "invitationId": invitation_id}
+
+            elif action in ("DECLINE_INVITATION", "DECLINE_INVITE"):
+                invitation_id = str(payload.get("invitationId", payload.get("id", "")))
+                if not invitation_id:
+                    return {"success": False, "action": action, "error": "That invitation is no longer waiting"}
+                success = await self.lcu_client.decline_invitation(invitation_id)
+                return {"success": success, "action": action, "invitationId": invitation_id}
 
             elif action in ("CHAMP_ACTION", "ACTION", "CHAMP_SELECT_ACTION"):
                 action_id = int(payload.get("actionId", 0))
@@ -846,6 +960,14 @@ class AppHub:
                     await self.mock_server.trigger_none()
                 await asyncio.sleep(0.05)
                 return {"success": True, "action": action, "phase": phase}
+
+            elif action in ("MOCK_INVITE", "MOCK_INVITATION") and self.mock_server is not None:
+                qid = int(payload.get("queueId", 440))
+                invitation = await self.mock_server.trigger_invitation(
+                    queue_id=qid, from_name=str(payload.get("fromSummonerName", ""))
+                )
+                await asyncio.sleep(0.05)
+                return {"success": True, "action": action, "invitationId": invitation["invitationId"]}
 
             elif action in ("MOCK_ADVANCE",) and self.mock_server is not None:
                 cur_phase = self.mock_server.gameflow_phase
@@ -995,6 +1117,26 @@ def create_app(custom_settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to set positions")
         return res
 
+    @app.post("/api/lobby/invitations/accept")
+    async def accept_invitation(body: InvitationRequest):
+        """Joins the party behind a received invitation."""
+        res = await hub.execute_action("ACCEPT_INVITATION", body.model_dump())
+        if not res.get("success"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=res.get("error") or "Failed to accept invitation"
+            )
+        return res
+
+    @app.post("/api/lobby/invitations/decline")
+    async def decline_invitation(body: InvitationRequest):
+        """Turns down a received invitation."""
+        res = await hub.execute_action("DECLINE_INVITATION", body.model_dump())
+        if not res.get("success"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=res.get("error") or "Failed to decline invitation"
+            )
+        return res
+
     @app.post("/api/lobby/queue/start")
     async def start_queue():
         """Starts matchmaking queue search."""
@@ -1066,6 +1208,13 @@ def create_app(custom_settings: Optional[Settings] = None) -> FastAPI:
         if hub.mock_server is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mock mode is not active")
         return await hub.execute_action("MOCK_SET_PHASE", body.model_dump())
+
+    @app.post("/api/mock/invite")
+    async def mock_invite(body: MockInviteRequest):
+        """Mock simulation helper to deliver an invitation from another player."""
+        if hub.mock_server is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mock mode is not active")
+        return await hub.execute_action("MOCK_INVITE", body.model_dump())
 
     @app.post("/api/mock/advance")
     async def mock_advance():

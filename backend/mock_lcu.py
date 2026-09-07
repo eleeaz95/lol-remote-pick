@@ -174,6 +174,7 @@ class MockLCUServer:
         self.queue_search: Optional[Dict[str, Any]] = None
         self.ready_check: Optional[Dict[str, Any]] = None
         self.champ_select: Optional[Dict[str, Any]] = None
+        self.received_invitations: List[Dict[str, Any]] = []
         self.game_teams: Optional[Dict[str, Any]] = None
         self.subset_champion_ids: List[int] = [63, 99, 45]
         # Other players, keyed by puuid. Their names are only reachable through the summoner
@@ -298,6 +299,32 @@ class MockLCUServer:
                     m["secondPositionPreference"] = body.get("secondPreference", "MIDDLE")
             await self.broadcast_event("/lol-lobby/v2/lobby", self.lobby)
             return {"status": "ok"}
+
+        # Received invitations
+        @app.get("/lol-lobby/v2/received-invitations")
+        async def get_received_invitations():
+            return self.received_invitations
+
+        @app.post("/lol-lobby/v2/received-invitations/{invitation_id}/accept")
+        async def accept_invitation(invitation_id: str):
+            invitation = self._find_invitation(invitation_id)
+            if invitation is None:
+                raise HTTPException(status_code=404, detail="Invitation not found")
+            invitation["state"] = "Accepted"
+            queue_id = (invitation.get("gameConfig") or {}).get("queueId", 420)
+            # Accepting drops you into the inviter's lobby, exactly as the real client does
+            await self.trigger_lobby(queue_id=queue_id)
+            await self.broadcast_event("/lol-lobby/v2/received-invitations", self.received_invitations)
+            return Response(status_code=204)
+
+        @app.post("/lol-lobby/v2/received-invitations/{invitation_id}/decline")
+        async def decline_invitation(invitation_id: str):
+            invitation = self._find_invitation(invitation_id)
+            if invitation is None:
+                raise HTTPException(status_code=404, detail="Invitation not found")
+            invitation["state"] = "Declined"
+            await self.broadcast_event("/lol-lobby/v2/received-invitations", self.received_invitations)
+            return Response(status_code=204)
 
         # Matchmaking
         @app.post("/lol-lobby/v2/lobby/matchmaking/search")
@@ -467,6 +494,49 @@ class MockLCUServer:
 
     # --- Phase State Transitions ---
 
+    def _find_invitation(self, invitation_id: str) -> Optional[Dict[str, Any]]:
+        """Find an invitation by id, whatever state it is in."""
+        for invitation in self.received_invitations:
+            if invitation.get("invitationId") == invitation_id:
+                return invitation
+        return None
+
+    async def _refresh_invitation_availability(self) -> None:
+        """Re-answer whether pending invitations can be accepted in the current phase.
+
+        The real client flips this as you enter and leave a game; freezing it at delivery would
+        leave the phone offering a join the client would refuse.
+        """
+        can_accept = self.gameflow_phase not in ("ChampSelect", "InProgress", "GameStart")
+        changed = False
+        for invitation in self.received_invitations:
+            if invitation.get("state") == "Pending" and invitation.get("canAcceptInvitation") != can_accept:
+                invitation["canAcceptInvitation"] = can_accept
+                changed = True
+        if changed:
+            await self.broadcast_event("/lol-lobby/v2/received-invitations", self.received_invitations)
+
+    async def trigger_invitation(self, queue_id: int = 440, from_name: str = "") -> Dict[str, Any]:
+        """Deliver an invitation from another player.
+
+        The sender's name is left empty by default, the way the client sends it since the Riot ID
+        migration, so the backend's profile lookup is exercised rather than bypassed.
+        """
+        player = next(iter(self.other_players.values()), None)
+        invitation = {
+            "invitationId": f"mock-invitation-{len(self.received_invitations) + 1}",
+            "state": "Pending",
+            "canAcceptInvitation": self.gameflow_phase not in ("ChampSelect", "InProgress", "GameStart"),
+            "fromSummonerId": player["summonerId"] if player else 200000002,
+            "fromSummonerPuuid": player["puuid"] if player else "",
+            "fromSummonerName": from_name,
+            "invitationType": "lobby",
+            "gameConfig": {"queueId": queue_id, "inviteGameType": "NORMAL"},
+        }
+        self.received_invitations.append(invitation)
+        await self.broadcast_event("/lol-lobby/v2/received-invitations", self.received_invitations)
+        return invitation
+
     async def trigger_idle(self) -> None:
         """Transition to IDLE state."""
         self.gameflow_phase = "None"
@@ -481,6 +551,7 @@ class MockLCUServer:
         await self.broadcast_event("/lol-matchmaking/v1/search", None, event_type="Delete")
         await self.broadcast_event("/lol-matchmaking/v1/ready-check", None, event_type="Delete")
         await self.broadcast_event("/lol-champ-select/v1/session", None, event_type="Delete")
+        await self._refresh_invitation_availability()
 
     async def trigger_lobby(self, queue_id: int = 420, party_size: int = 0) -> None:
         """Transition to LOBBY state.
@@ -562,6 +633,7 @@ class MockLCUServer:
         await self.broadcast_event("/lol-matchmaking/v1/search", None, event_type="Delete")
         await self.broadcast_event("/lol-matchmaking/v1/ready-check", None, event_type="Delete")
         await self.broadcast_event("/lol-champ-select/v1/session", None, event_type="Delete")
+        await self._refresh_invitation_availability()
 
     async def trigger_queue(self) -> None:
         """Transition to MATCHMAKING queue state."""
@@ -612,6 +684,7 @@ class MockLCUServer:
 
         await self.broadcast_event("/lol-gameflow/v1/gameflow-phase", "ChampSelect")
         await self.broadcast_event("/lol-champ-select/v1/session", self.champ_select)
+        await self._refresh_invitation_availability()
 
     def _build_draft_session(self) -> Dict[str, Any]:
         """Pick/ban draft session (Summoner's Rift queues)."""
@@ -949,6 +1022,7 @@ class MockLCUServer:
                 },
             },
         )
+        await self._refresh_invitation_availability()
 
     def _build_game_teams(self) -> Dict[str, Any]:
         """Roster shaped like a live gameflow session: champion ids, no player names."""

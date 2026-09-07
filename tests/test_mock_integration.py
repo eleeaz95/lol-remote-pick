@@ -8,6 +8,7 @@ Verifies end-to-end functionality of:
 - GET /api/queues (queue definitions)
 - POST /api/lobby/create (create lobby)
 - POST /api/lobby/positions (set role preferences)
+- POST /api/lobby/invitations/accept & /decline (answer party invitations)
 - POST /api/lobby/queue/start (matchmaking search)
 - POST /api/lobby/queue/cancel (cancel search)
 - POST /api/matchmaking/accept (ready check accept)
@@ -526,11 +527,69 @@ async def test_mock_lobby_can_be_filled_to_a_five_stack(mock_app_and_client):
 
 
 @pytest.mark.asyncio
+async def test_received_invitations_can_be_accepted_and_declined(mock_app_and_client):
+    """An invitation joins the sender's lobby, and a declined one stops being offered."""
+    app, client, hub = mock_app_and_client
+
+    await hub.mock_server.trigger_lobby(queue_id=420)
+    await hub.mock_server.trigger_invitation(queue_id=440)
+    await asyncio.sleep(0.3)
+
+    invitations = (await client.get("/api/state")).json()["invitations"]
+    assert len(invitations) == 1
+    # The mock sends an empty sender name, as the client does; the backend looks the profile up
+    assert invitations[0]["fromSummonerName"] == "MockDuo#LAS"
+    assert invitations[0]["queueName"] == "Ranked Flex 5v5"
+
+    res = await client.post("/api/lobby/invitations/accept", json={"invitationId": invitations[0]["id"]})
+    assert res.status_code == 200
+    await asyncio.sleep(0.2)
+
+    state = (await client.get("/api/state")).json()
+    assert state["lobby"]["queueId"] == 440, "accepting joins the party behind the invitation"
+    assert state["invitations"] == []
+
+    # A declined invitation disappears without touching the lobby
+    await hub.mock_server.trigger_invitation(queue_id=450)
+    await asyncio.sleep(0.3)
+    pending = (await client.get("/api/state")).json()["invitations"]
+    res_decline = await client.post("/api/lobby/invitations/decline", json={"invitationId": pending[0]["id"]})
+    assert res_decline.status_code == 200
+    await asyncio.sleep(0.2)
+
+    after = (await client.get("/api/state")).json()
+    assert after["invitations"] == []
+    assert after["lobby"]["queueId"] == 440
+
+
+@pytest.mark.asyncio
+async def test_invitation_cannot_be_accepted_during_a_game(mock_app_and_client):
+    """The client refuses a party change mid game, so the action is refused before it is sent."""
+    app, client, hub = mock_app_and_client
+
+    await hub.mock_server.trigger_champ_select(queue_id=420)
+    await hub.mock_server.trigger_invitation(queue_id=440)
+    await asyncio.sleep(0.3)
+
+    invitations = (await client.get("/api/state")).json()["invitations"]
+    assert invitations[0]["canAccept"] is False
+
+    res = await client.post("/api/lobby/invitations/accept", json={"invitationId": invitations[0]["id"]})
+    assert res.status_code == 400
+    assert "until this game is over" in res.json()["detail"]
+
+    # Declining is still allowed while a game is running
+    res_decline = await client.post("/api/lobby/invitations/decline", json={"invitationId": invitations[0]["id"]})
+    assert res_decline.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_websocket_gateway_knows_every_rest_endpoint():
     """The socket is the frontend's first choice: an unmapped endpoint would do nothing at all."""
     from backend.server import action_for_endpoint
 
+    assert action_for_endpoint("/api/lobby/invitations/accept") == "ACCEPT_INVITATION"
+    assert action_for_endpoint("/api/lobby/invitations/decline") == "DECLINE_INVITATION"
     assert action_for_endpoint("/api/lobby/positions") == "SET_POSITIONS"
     assert action_for_endpoint("/api/champ-select/bench-swap") == "BENCH_SWAP"
-    assert action_for_endpoint("/api/matchmaking/accept") == "ACCEPT_MATCH"
     assert action_for_endpoint("/api/unknown") == ""

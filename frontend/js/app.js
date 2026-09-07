@@ -72,6 +72,9 @@
       benchEnabled: false,
       bench: [], // [{ championId, isPriority }]
     },
+    // Party invitations waiting for an answer. Not a phase: they arrive while idle, in a lobby or
+    // in queue, and several can be pending at once.
+    invitations: [],
     inGame: {
       queueId: 0,
       queueName: '',
@@ -122,6 +125,9 @@
     queueStartMs: 0,
     lastQueueDisplayedSec: -1,
     rolesChangedAtMs: 0,
+    knownInvitationIds: [],
+    invitationSeenAt: {},
+    invitationAnnounceTimeout: null,
   };
   // Default Fallback Catalogs
   const DEFAULT_SPELLS = [
@@ -980,8 +986,19 @@
       };
     }
 
+    state.invitations = Array.isArray(payload.invitations)
+      ? payload.invitations.map((inv) => ({
+          id: String(inv.id || ''),
+          fromSummonerName: inv.fromSummonerName || '',
+          profileIconId: Number(inv.profileIconId) || 0,
+          queueName: inv.queueName || '',
+          canAccept: inv.canAccept !== false,
+        }))
+      : [];
+
     // Process State Transitions & Audio/Vibration Triggers
     handlePhaseTransitions();
+    announceNewInvitations();
 
     // Render Full UI
     renderApp();
@@ -1016,6 +1033,51 @@
 
     localState.prevPhase = currPhase;
     localState.prevIsMyTurn = state.champSelect.isMyTurn;
+  }
+
+  // How long an invitation waits for its sender's name before it announces itself anyway
+  const NAME_GRACE_MS = 1500;
+
+  // An invitation can land on any screen, so it announces itself instead of waiting to be found:
+  // the card only lives in the lobby view, and champ select never gives up the screen for one.
+  function announceNewInvitations() {
+    const now = Date.now();
+    const currentIds = state.invitations.map((inv) => inv.id);
+
+    // An invitation that is gone can be sent again, and should announce itself a second time
+    localState.knownInvitationIds = localState.knownInvitationIds.filter((id) => currentIds.includes(id));
+    Object.keys(localState.invitationSeenAt).forEach((id) => {
+      if (!currentIds.includes(id)) delete localState.invitationSeenAt[id];
+    });
+
+    const arrived = state.invitations.filter((inv) => !localState.knownInvitationIds.includes(inv.id));
+    if (arrived.length === 0) return;
+
+    // The sender's name lands a snapshot later, once the backend has looked their profile up.
+    // Hold a nameless invitation back for a moment rather than announcing it as "Someone".
+    const announceable = arrived.filter((inv) => {
+      if (!localState.invitationSeenAt[inv.id]) localState.invitationSeenAt[inv.id] = now;
+      return Boolean(inv.fromSummonerName) || now - localState.invitationSeenAt[inv.id] >= NAME_GRACE_MS;
+    });
+
+    if (announceable.length < arrived.length) {
+      // Nothing else is guaranteed to arrive if the lookup comes back empty, so drive the deadline
+      clearTimeout(localState.invitationAnnounceTimeout);
+      localState.invitationAnnounceTimeout = setTimeout(announceNewInvitations, NAME_GRACE_MS + 100);
+    }
+    if (announceable.length === 0) return;
+
+    localState.knownInvitationIds.push(...announceable.map((inv) => inv.id));
+
+    const first = announceable[0];
+    const who = first.fromSummonerName ? first.fromSummonerName.split('#')[0] : 'Someone';
+    const message =
+      announceable.length > 1
+        ? `${announceable.length} party invitations waiting`
+        : `${who} invited you to ${first.queueName || 'a game'}`;
+    showToast(message, 'info');
+    playYourTurnSound();
+    triggerVibrate([120, 80, 120]);
   }
 
   // =========================================================================
@@ -1270,7 +1332,44 @@
     if (hasOption(selectS, second)) selectS.value = second;
   }
 
+  function renderInvitations() {
+    const card = document.getElementById('invitations-card');
+    const list = document.getElementById('invitations-list');
+    const count = document.getElementById('invitations-count');
+    if (!card || !list) return;
+
+    toggleElementById('invitations-card', state.invitations.length > 0);
+    if (count) count.textContent = String(state.invitations.length);
+    if (state.invitations.length === 0) {
+      list.innerHTML = '';
+      return;
+    }
+
+    list.innerHTML = '';
+    state.invitations.forEach((invitation) => {
+      const row = document.createElement('div');
+      row.className = 'invitation-row';
+      row.innerHTML = `
+        <div class="invitation-left">
+          <img class="member-avatar" src="${getSummonerIconUrl(invitation.profileIconId || 29)}" alt="Avatar">
+          <div class="invitation-text">
+            <span class="member-name">${escapeHtml(invitation.fromSummonerName || 'Summoner')}</span>
+            <span class="invitation-queue">${escapeHtml(invitation.queueName || 'Custom game')}</span>
+          </div>
+        </div>
+        <div class="invitation-actions">
+          <button class="btn-invitation accept" data-invitation-accept="${escapeHtml(invitation.id)}" ${
+            invitation.canAccept ? '' : 'disabled'
+          }>Join</button>
+          <button class="btn-invitation decline" data-invitation-decline="${escapeHtml(invitation.id)}" aria-label="Decline">✕</button>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+  }
+
   function renderLobbyView() {
+    renderInvitations();
     // Modes that assign champions at random have no lanes to prefer. The control is not
     // disabled but removed: nothing the player could do here would ever make it apply.
     toggleElementById('position-card', state.lobby.hasPositions !== false);
@@ -2350,6 +2449,27 @@
       };
       selectP.addEventListener('change', onRoleChange);
       selectS.addEventListener('change', onRoleChange);
+    }
+
+    // Invitations. The rows are rebuilt on every snapshot, so the handler lives on the container.
+    const invitationsList = document.getElementById('invitations-list');
+    if (invitationsList) {
+      invitationsList.addEventListener('click', (event) => {
+        const acceptBtn = event.target.closest('[data-invitation-accept]');
+        const declineBtn = event.target.closest('[data-invitation-decline]');
+        if (!acceptBtn && !declineBtn) return;
+
+        playClickSound();
+        const endpoint = acceptBtn ? '/api/lobby/invitations/accept' : '/api/lobby/invitations/decline';
+        const invitationId = acceptBtn
+          ? acceptBtn.getAttribute('data-invitation-accept')
+          : declineBtn.getAttribute('data-invitation-decline');
+
+        // The row stays put until the client confirms: the snapshot that follows removes it, and
+        // a refusal has to leave the invitation where it was rather than lose it.
+        if (acceptBtn) acceptBtn.disabled = true;
+        sendApiRequest(endpoint, { invitationId });
+      });
     }
 
     // Start Queue

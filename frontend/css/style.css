@@ -732,6 +732,93 @@ body.hextech-theme {
   font-weight: 600;
 }
 
+/* Incoming Invitations */
+.invitations-card {
+  border-color: rgba(10, 200, 185, 0.45);
+  box-shadow: 0 0 14px rgba(10, 200, 185, 0.12);
+}
+
+.invitations-card .header-tag {
+  color: var(--hex-magic);
+}
+
+.invitations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.invitation-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(8, 16, 28, 0.6);
+  border: 1px solid rgba(10, 200, 185, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+.invitation-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.invitation-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.invitation-text .member-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invitation-queue {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.invitation-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-invitation {
+  font-family: inherit;
+  min-height: var(--tap-min);
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-invitation.accept {
+  background: rgba(10, 200, 185, 0.18);
+  border: 1px solid var(--hex-magic);
+  color: var(--hex-magic);
+}
+
+.btn-invitation.accept:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-invitation.decline {
+  padding: 0 12px;
+  background: rgba(232, 64, 87, 0.12);
+  border: 1px solid rgba(232, 64, 87, 0.5);
+  color: var(--danger-red);
+}
+
 .lobby-bottom-bar {
   position: fixed;
   bottom: 0;

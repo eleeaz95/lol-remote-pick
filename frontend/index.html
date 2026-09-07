@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260906_20">
+  <link rel="stylesheet" href="css/style.css?v=20260907_21">
 </head>
 <body class="hextech-theme">
   <div id="app" class="app-container">
@@ -78,6 +78,17 @@
       <!-- 2. LOBBY VIEW -->
       <section id="view-lobby" class="view-panel hidden">
         <div class="lobby-container">
+          <!-- Incoming Party Invitations (hidden while there are none) -->
+          <div id="invitations-card" class="hextech-card invitations-card hidden">
+            <div class="card-header">
+              <span class="header-tag">Invitations</span>
+              <span id="invitations-count" class="count-tag">0</span>
+            </div>
+            <div id="invitations-list" class="invitations-list">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
           <!-- Queue Selection Card -->
           <div class="hextech-card queue-card">
             <div class="card-header">
@@ -511,6 +522,6 @@
     <div id="toast-container" class="toast-container"></div>
   </div>
 
-  <script src="js/app.js?v=20260906_20"></script>
+  <script src="js/app.js?v=20260907_21"></script>
 </body>
 </html>
