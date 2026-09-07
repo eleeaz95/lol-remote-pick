@@ -625,6 +625,8 @@ class MockLCUServer:
                 "totalTimeInPhase": 30.0,
             },
             "bans": {
+                # Both teams' bans counted together, the way the client reports it
+                "numBans": 10,
                 "myTeamBans": [],
                 "theirTeamBans": [238],
             },

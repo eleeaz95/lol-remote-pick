@@ -856,6 +856,7 @@ class StateEngine:
             "bans": {
                 "myTeamBans": [],
                 "theirTeamBans": [],
+                "bansPerTeam": 0,
             },
             "myTeam": [],
             "theirTeam": [],
@@ -961,6 +962,14 @@ class StateEngine:
         my_team_bans = bans_raw.get("myTeamBans", [])
         their_team_bans = bans_raw.get("theirTeamBans", [])
 
+        # The client counts both teams' bans together. Halving it gives the phone the number of
+        # slots to lay out, so a ban row keeps its shape instead of growing a box at a time.
+        num_bans = bans_raw.get("numBans")
+        if isinstance(num_bans, int) and num_bans > 0:
+            bans_per_team = num_bans // 2
+        else:
+            bans_per_team = max(len(my_team_bans), len(their_team_bans))
+
         # 4. My Team parsing
         my_team = []
         local_pick_intent = 0
@@ -1045,6 +1054,7 @@ class StateEngine:
             "bans": {
                 "myTeamBans": my_team_bans,
                 "theirTeamBans": their_team_bans,
+                "bansPerTeam": bans_per_team,
             },
             "myTeam": my_team,
             "theirTeam": their_team,

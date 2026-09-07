@@ -918,3 +918,34 @@ async def test_state_engine_lobby_drops_the_second_position_in_a_full_party():
     lobby = engine.get_state()["lobby"]
     assert lobby["hasPositions"] is False
     assert lobby["allowsSecondPosition"] is False
+
+
+async def test_state_engine_reports_ban_slots_per_team():
+    """The phone lays out a fixed ban row, so it needs the count the client keeps for both teams."""
+    engine = StateEngine()
+    engine.set_connected(True)
+
+    await engine.handle_lcu_event(
+        "/lol-champ-select/v1/session",
+        {
+            "localPlayerCellId": 0,
+            "bans": {"numBans": 10, "myTeamBans": [84], "theirTeamBans": [238]},
+            "myTeam": [{"cellId": 0, "summonerName": "Me"}],
+            "theirTeam": [],
+            "actions": [],
+        },
+    )
+    assert engine.get_state()["champSelect"]["bans"]["bansPerTeam"] == 5
+
+    # Queues that ban nothing, and older payloads without the count, fall back to what was banned
+    await engine.handle_lcu_event(
+        "/lol-champ-select/v1/session",
+        {
+            "localPlayerCellId": 0,
+            "bans": {"myTeamBans": [], "theirTeamBans": [238]},
+            "myTeam": [{"cellId": 0, "summonerName": "Me"}],
+            "theirTeam": [],
+            "actions": [],
+        },
+    )
+    assert engine.get_state()["champSelect"]["bans"]["bansPerTeam"] == 1

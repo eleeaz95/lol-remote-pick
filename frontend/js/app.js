@@ -59,6 +59,7 @@
       bans: {
         myTeamBans: [],
         theirTeamBans: [],
+        bansPerTeam: 0,
       },
       myTeam: [],
       theirTeam: [],
@@ -894,6 +895,7 @@
         bans: {
           myTeamBans: cs.bans?.myTeamBans || [],
           theirTeamBans: cs.bans?.theirTeamBans || [],
+          bansPerTeam: cs.bans?.bansPerTeam || 0,
         },
         myTeam: Array.isArray(cs.myTeam) ? cs.myTeam : [],
         theirTeam: Array.isArray(cs.theirTeam) ? cs.theirTeam : [],
@@ -1781,31 +1783,24 @@
       });
     }
 
-    // Bans
-    if (allyBansEl) {
-      allyBansEl.innerHTML = '';
-      cs.bans.myTeamBans.forEach((bId) => {
-        const champ = localState.championsMap.get(bId);
-        const b = document.createElement('div');
-        b.className = 'ban-slot-mini';
-        b.innerHTML = champ
-          ? `<img class="ban-champ-img" src="${getChampionIconUrl(champ.key)}"><div class="ban-slash"></div>`
-          : '<div class="ban-slash"></div>';
-        allyBansEl.appendChild(b);
-      });
-    }
+    // Bans. The empty slots are drawn too: the row keeps its shape through the ban phase instead
+    // of growing a box at a time, and how many bans are still coming stays visible.
+    renderBanSlots(allyBansEl, cs.bans.myTeamBans);
+    renderBanSlots(enemyBansEl, cs.bans.theirTeamBans);
+  }
 
-    if (enemyBansEl) {
-      enemyBansEl.innerHTML = '';
-      cs.bans.theirTeamBans.forEach((bId) => {
-        const champ = localState.championsMap.get(bId);
-        const b = document.createElement('div');
-        b.className = 'ban-slot-mini';
-        b.innerHTML = champ
-          ? `<img class="ban-champ-img" src="${getChampionIconUrl(champ.key)}"><div class="ban-slash"></div>`
-          : '<div class="ban-slash"></div>';
-        enemyBansEl.appendChild(b);
-      });
+  function renderBanSlots(container, bans) {
+    if (!container) return;
+    container.innerHTML = '';
+    const slots = Math.max(bans.length, state.champSelect.bans.bansPerTeam || 0);
+    for (let i = 0; i < slots; i += 1) {
+      const champ = localState.championsMap.get(bans[i]);
+      const slot = document.createElement('div');
+      slot.className = `ban-slot-mini ${i < bans.length ? '' : 'is-empty'}`;
+      slot.innerHTML = champ
+        ? `<img class="ban-champ-img" src="${getChampionIconUrl(champ.key)}" alt="${escapeHtml(champ.name)}"><div class="ban-slash"></div>`
+        : `${i < bans.length ? '<div class="ban-slash"></div>' : ''}`;
+      container.appendChild(slot);
     }
   }
 
